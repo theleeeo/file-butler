@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/fatih/color"
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 	"github.com/theleeeo/file-butler/provider"
 	"github.com/theleeeo/file-butler/server"
@@ -28,7 +29,9 @@ func main() {
 		return
 	}
 
-	providers, err := loadProviders()
+	// Create a new viper instance for provider configs to not conflict with the main config
+	pvp := viper.New()
+	providers, _, err := loadProviders(pvp, nil)
 	if err != nil {
 		color.Red("ERROR: %s", err)
 		return
@@ -50,12 +53,46 @@ func main() {
 		}
 	}
 
+	pvp.WatchConfig()
+	pvp.OnConfigChange(reloadProvidersFunc(pvp, srv))
+
 	log.Println(srv.Run(context.Background()))
 }
 
-func loadProviders() ([]provider.Provider, error) {
-	// Create a new viper instance for provider configs to not conflict with the main config
-	pvp := viper.New()
+func reloadProvidersFunc(pvp *viper.Viper, srv *server.Server) func(fsnotify.Event) {
+	return func(in fsnotify.Event) {
+		log.Println("Reloading providers")
+
+		currentProviders := srv.ProviderIds()
+
+		newProviders, removedProviders, err := loadProviders(pvp, currentProviders)
+		if err != nil {
+			log.Println(color.RedString("ERROR: %s", err))
+			return
+		}
+
+		if len(newProviders) == 0 && len(removedProviders) == 0 {
+			log.Println("No changes to the providers detected")
+			return
+		}
+
+		for _, p := range newProviders {
+			if err := srv.RegisterProvider(p); err != nil {
+				log.Println(color.RedString("ERROR registering provider %s: %s", p.Id(), err))
+			}
+		}
+
+		for _, id := range removedProviders {
+			srv.RemoveProvider(id)
+		}
+	}
+}
+
+// loadProviders loads the provider configurations from the provider config file
+// It takes an optional slice of the IDs of the currently registered providers so that it will not duplicate the providers during a live reload.
+//
+// It returns a slice of instantiated providers and a slice of the IDs of the providers that should be removed since they does not exist in the new config.
+func loadProviders(pvp *viper.Viper, registeredProviders []string) ([]provider.Provider, []string, error) {
 	pvp.SetConfigName("providers")
 	pvp.AddConfigPath(".")
 	pvp.AddConfigPath("$HOME/.filebutler")
@@ -63,17 +100,27 @@ func loadProviders() ([]provider.Provider, error) {
 	err := pvp.ReadInConfig()
 	if err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			return nil, fmt.Errorf("provider file not found")
+			return nil, nil, fmt.Errorf("provider file not found")
 		}
 
-		return nil, fmt.Errorf("error reading provider file: %w", err)
+		return nil, nil, fmt.Errorf("error reading provider file: %w", err)
 	}
 
 	var providers []provider.Provider
+ProviderLoop:
 	for id, v := range pvp.AllSettings() {
+		// Check if the provider is already registered
+		for i, currentId := range registeredProviders {
+			if id == currentId {
+				// Remove the provider from the list of current providers so that it will not be removed later
+				registeredProviders = append(registeredProviders[:i], registeredProviders[i+1:]...)
+				continue ProviderLoop
+			}
+		}
+
 		providerType := pvp.GetString(fmt.Sprintf("%s.type", id))
 		if providerType == "" {
-			return nil, fmt.Errorf("type is required, missing for: %s", id)
+			return nil, nil, fmt.Errorf("type is required, missing for: %s", id)
 		}
 
 		var cfg provider.Config
@@ -88,10 +135,10 @@ func loadProviders() ([]provider.Provider, error) {
 		case string(provider.ProviderTypeS3):
 			cfg, err = unmarshalProviderCfg[*provider.S3Config](id, v)
 		default:
-			return nil, fmt.Errorf("unknown provider type: %s", providerType)
+			return nil, nil, fmt.Errorf("unknown provider type: %s", providerType)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse config of provider %s: %w", id, err)
+			return nil, nil, fmt.Errorf("unable to parse config of provider %s: %w", id, err)
 		}
 
 		// Create the provider based on the config
@@ -107,13 +154,14 @@ func loadProviders() ([]provider.Provider, error) {
 			p = provider.NewLogProvider(cfg)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("unable to create provider %s: %w", id, err)
+			return nil, nil, fmt.Errorf("unable to create provider %s: %w", id, err)
 		}
 
 		providers = append(providers, p)
 	}
 
-	return providers, nil
+	// The currentProviders slice now contains the IDs of the already registered providers that are not in the new config
+	return providers, registeredProviders, nil
 }
 
 func unmarshalProviderCfg[T provider.Config](id string, v any) (T, error) {

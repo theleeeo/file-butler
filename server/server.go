@@ -16,6 +16,10 @@ import (
 // NewServer creates a new server instance
 // No providers are registered by default, they must be registered using the RegisterProvider method
 func NewServer(serverCfg Config) (*Server, error) {
+	if serverCfg.Addr == "" {
+		return nil, errors.New("address is required")
+	}
+
 	s := &Server{
 		cfg:       serverCfg,
 		providers: make(map[string]provider.Provider),
@@ -86,6 +90,26 @@ func (s *Server) RemoveProvider(id string) {
 	delete(s.providers, id)
 }
 
+func (s *Server) ProviderIds() []string {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+
+	var providerIds []string
+	for _, p := range s.providers {
+		providerIds = append(providerIds, p.Id())
+	}
+
+	return providerIds
+}
+
+func (s *Server) getProvider(id string) (provider.Provider, bool) {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+
+	p, ok := s.providers[id]
+	return p, ok
+}
+
 func (s *Server) Run(ctx context.Context) error {
 	log.Printf("Server is listening on %s", s.cfg.Addr)
 	if err := s.srv.ListenAndServe(); err != nil {
@@ -103,10 +127,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	providerName := r.PathValue("provider")
 
-	s.mx.RLock()
-	defer s.mx.RUnlock()
-
-	p, ok := s.providers[providerName]
+	p, ok := s.getProvider(providerName)
 	if !ok {
 		http.Error(w, "provider not found", http.StatusNotFound)
 		return
@@ -166,10 +187,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	providerName := r.PathValue("provider")
 
-	s.mx.RLock()
-	defer s.mx.RUnlock()
-
-	p, ok := s.providers[providerName]
+	p, ok := s.getProvider(providerName)
 	if !ok {
 		http.Error(w, "provider not found", http.StatusNotFound)
 		return
