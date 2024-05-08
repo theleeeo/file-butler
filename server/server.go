@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/theleeeo/file-butler/lerr"
 	"github.com/theleeeo/file-butler/provider"
 )
 
@@ -21,15 +22,15 @@ func NewServer(serverCfg Config) (*Server, error) {
 	}
 
 	s := &Server{
-		cfg:       serverCfg,
-		providers: make(map[string]provider.Provider),
+		allowRawBody: serverCfg.AllowRawBody,
+		providers:    make(map[string]provider.Provider),
 	}
 
 	http.HandleFunc("/{provider}/{key}", s.handleUpload)
 	http.HandleFunc("GET /{provider}/{key}", s.handleDownload)
 
 	srv := &http.Server{
-		Addr:              s.cfg.Addr,
+		Addr:              serverCfg.Addr,
 		Handler:           InternalErrorRedacter()(http.DefaultServeMux),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       10 * time.Second,
@@ -49,7 +50,7 @@ type Config struct {
 }
 
 type Server struct {
-	cfg Config
+	allowRawBody bool
 
 	mx        sync.RWMutex
 	providers map[string]provider.Provider
@@ -111,7 +112,7 @@ func (s *Server) getProvider(id string) (provider.Provider, bool) {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	log.Printf("Server is listening on %s", s.cfg.Addr)
+	log.Printf("Server is listening on %s", s.srv.Addr)
 	if err := s.srv.ListenAndServe(); err != nil {
 		return err
 	}
@@ -126,7 +127,6 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	providerName := r.PathValue("provider")
-
 	p, ok := s.getProvider(providerName)
 	if !ok {
 		http.Error(w, "provider not found", http.StatusNotFound)
@@ -139,37 +139,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var data io.ReadCloser
-	defer func() {
-		if data != nil {
-			data.Close()
-		}
-	}()
-
-	contentType := r.Header.Get("Content-Type")
-	if strings.Contains(contentType, "multipart/form-data") {
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			log.Println("Error parsing multipart form:", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		file, _, err := r.FormFile("file")
-		if err != nil {
-			log.Println("Error getting file from form:", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		data = file
-	} else {
-		if !s.cfg.AllowRawBody {
-			log.Println("Attempted to upload raw body data when it is not allowed")
-			http.Error(w, "raw body uploads are not allowed, use multipart form data", http.StatusBadRequest)
-			return
-		}
-
-		data = r.Body
+	data, err := getDataSource(r, s.allowRawBody)
+	if err != nil {
+		http.Error(w, err.Error(), lerr.Code(err))
+		return
 	}
+	defer data.Close()
 
 	if err := p.PutObject(r.Context(), key, data); err != nil {
 		if errors.Is(err, provider.ErrDenied) {
@@ -182,6 +157,37 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
+	var data io.ReadCloser
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			log.Println("Error parsing multipart form:", err)
+
+			return nil, lerr.Wrap("error parsing multipart form:", err, http.StatusBadRequest)
+		}
+
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			log.Println("Error getting file from form:", err)
+
+			return nil, lerr.Wrap("error getting file from form:", err, http.StatusBadRequest)
+		}
+		data = file
+	} else {
+		if !allowRawBody {
+			log.Println("Attempted to upload raw body data when it is not allowed")
+
+			return nil, lerr.New("raw body uploads are not allowed, use multipart form data", http.StatusBadRequest)
+		}
+
+		data = r.Body
+	}
+
+	return data, nil
 }
 
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
