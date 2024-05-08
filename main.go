@@ -81,8 +81,8 @@ func loadProviders() ([]provider.Provider, error) {
 
 		// Parse the provider config based on the provider type
 		switch providerType {
-		case string(provider.ProviderTypeNull):
-			cfg, err = unmarshalProviderCfg[*provider.NullConfig](id, v)
+		case string(provider.ProviderTypeVoid):
+			cfg, err = unmarshalProviderCfg[*provider.VoidConfig](id, v)
 		case string(provider.ProviderTypeLog):
 			cfg, err = unmarshalProviderCfg[*provider.LogConfig](id, v)
 		case string(provider.ProviderTypeS3):
@@ -101,8 +101,8 @@ func loadProviders() ([]provider.Provider, error) {
 		switch cfg := cfg.(type) {
 		case *provider.S3Config:
 			p, err = provider.NewS3Provider(cfg)
-		case *provider.NullConfig:
-			p = provider.NewNullProvider(cfg)
+		case *provider.VoidConfig:
+			p = provider.NewVoidProvider(cfg)
 		case *provider.LogConfig:
 			p = provider.NewLogProvider(cfg)
 		}

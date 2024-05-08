@@ -14,8 +14,8 @@ var (
 type ProviderType string
 
 const (
-	// ProviderTypeNull is a provider that does nothing
-	ProviderTypeNull ProviderType = "null"
+	// ProviderTypeVoid is a provider that does nothing
+	ProviderTypeVoid ProviderType = "void"
 	// ProviderTypeLog is a provider that logs all operations
 	ProviderTypeLog ProviderType = "log"
 	// ProviderTypeS3 is a provider that uses AWS S3
