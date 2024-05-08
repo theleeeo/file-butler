@@ -3,10 +3,8 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log"
-	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -15,9 +13,12 @@ import (
 	"github.com/theleeeo/file-butler/provider"
 )
 
-func NewServer(serverCfg Config, providerCfgs []provider.Config) (*Server, error) {
+// NewServer creates a new server instance
+// No providers are registered by default, they must be registered using the RegisterProvider method
+func NewServer(serverCfg Config) (*Server, error) {
 	s := &Server{
-		cfg: serverCfg,
+		cfg:       serverCfg,
+		providers: make(map[string]provider.Provider),
 	}
 
 	http.HandleFunc("/{provider}/{key}", s.handleUpload)
@@ -31,37 +32,15 @@ func NewServer(serverCfg Config, providerCfgs []provider.Config) (*Server, error
 	}
 	s.srv = srv
 
-	s.providers = make(map[string]provider.Provider)
-
-	for _, cfg := range providerCfgs {
-		var p provider.Provider
-		var err error
-
-		switch cfg := cfg.(type) {
-		case *provider.S3Config:
-			p, err = provider.NewS3Provider(cfg)
-		case *provider.NullConfig:
-			p = &provider.NullProvider{}
-		case *provider.LogConfig:
-			p = &provider.LogProvider{}
-		default:
-			return nil, fmt.Errorf("unknown provider type: %T", cfg)
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("unable to create provider: %w", err)
-		}
-
-		s.RegisterProvider(cfg.Id(), p)
-	}
-
 	return s, nil
 }
 
 type Config struct {
+	// Addr is the host:port the server will listen on
 	Addr string
 
 	// AllowRawBody allows to upload files using raw body data instead of multipart form data
+	// Eg. This is what is used when uploading files using curl
 	AllowRawBody bool
 }
 
@@ -74,13 +53,28 @@ type Server struct {
 	srv *http.Server
 }
 
-func (s *Server) RegisterProvider(id string, p provider.Provider) {
+func (s *Server) RegisterProvider(p provider.Provider) error {
+	if p == nil || p.Id() == "" {
+		return errors.New("provider is nil or has no ID")
+	}
+
+	id := p.Id()
+
+	s.mx.RLock()
+	if _, ok := s.providers[id]; ok {
+		s.mx.RUnlock()
+		return errors.New("provider already registered")
+	}
+	s.mx.RUnlock()
+
 	log.Println("Registering provider", id)
 
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
 	s.providers[id] = p
+
+	return nil
 }
 
 func (s *Server) RemoveProvider(id string) {
@@ -133,8 +127,6 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "multipart/form-data") {
-		slog.Debug("Handling multipart form data", "Content-Length", r.ContentLength)
-
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			log.Println("Error parsing multipart form:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -150,11 +142,11 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		data = file
 	} else {
 		if !s.cfg.AllowRawBody {
-			http.Error(w, "raw body uploads are not allowed", http.StatusBadRequest)
+			log.Println("Attempted to upload raw body data when it is not allowed")
+			http.Error(w, "raw body uploads are not allowed, use multipart form data", http.StatusBadRequest)
 			return
 		}
 
-		slog.Debug("Handling raw body data", "Content-Type", contentType, "Content-Length", r.ContentLength)
 		data = r.Body
 	}
 

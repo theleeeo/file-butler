@@ -23,3 +23,11 @@ go.work
 dev
 
 .air.toml
+
+config.*
+*.config.*
+!config.example.*
+
+providers.*
+*.providers.*
+!providers.example.*

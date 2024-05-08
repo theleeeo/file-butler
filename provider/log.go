@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -15,7 +16,18 @@ func (n *LogConfig) Id() string {
 	return n.ID
 }
 
+func NewLogProvider(cfg *LogConfig) *LogProvider {
+	return &LogProvider{
+		id: cfg.ID,
+	}
+}
+
 type LogProvider struct {
+	id string
+}
+
+func (n *LogProvider) Id() string {
+	return n.id
 }
 
 func (n *LogProvider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
@@ -28,6 +40,16 @@ func (n *LogProvider) PutObject(ctx context.Context, key string, data io.Reader)
 	if err != nil {
 		return err
 	}
-	log.Printf("PutObject key=%s, len=%dmb\n", key, len(b)/1000000)
+
+	var l string
+	if len(b) < 1024 {
+		l = fmt.Sprintf("%db", len(b))
+	} else if len(b) < 1024*1024 {
+		l = fmt.Sprintf("%dkb", len(b)/1024)
+	} else {
+		l = fmt.Sprintf("%dmb", len(b)/1024/1024)
+	}
+
+	log.Printf("PutObject key=%s, size=%s\n", key, l)
 	return nil
 }

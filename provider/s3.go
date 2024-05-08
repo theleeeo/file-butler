@@ -39,15 +39,21 @@ func NewS3Provider(cfg *S3Config) (*S3Provider, error) {
 	client := s3.NewFromConfig(clientCfg)
 
 	return &S3Provider{
+		id:         cfg.ID,
 		bucketName: cfg.Bucket,
 		client:     client,
 	}, nil
 }
 
 type S3Provider struct {
+	id         string
 	bucketName string
 
 	client *s3.Client
+}
+
+func (s *S3Provider) Id() string {
+	return s.id
 }
 
 func (s *S3Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {

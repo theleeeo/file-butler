@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
@@ -13,7 +14,6 @@ import (
 
 func main() {
 	viper.SetConfigName("config")
-	viper.SetConfigType("toml")
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("$HOME/.filebutler")
 	viper.AddConfigPath("/etc/filebutler/")
@@ -28,55 +28,58 @@ func main() {
 		return
 	}
 
-	providerCfgs, err := loadProviders()
+	providers, err := loadProviders()
 	if err != nil {
 		color.Red("ERROR: %s", err)
 		return
 	}
 
-	for _, cfg := range providerCfgs {
-		fmt.Printf("provider: %s\n", cfg.Id())
-	}
-
 	srv, err := server.NewServer(server.Config{
 		Addr:         viper.GetString("server.addr"),
 		AllowRawBody: viper.GetBool("server.allow_raw_body"),
-	}, providerCfgs)
+	})
 	if err != nil {
-		fmt.Println(err)
+		color.Red("ERROR creating server: %s", err)
 		return
 	}
 
-	fmt.Println(srv.Run(context.Background()))
+	for _, p := range providers {
+		if err := srv.RegisterProvider(p); err != nil {
+			color.Red("ERROR registering provider %s: %s", p.Id(), err)
+			return
+		}
+	}
+
+	log.Println(srv.Run(context.Background()))
 }
 
-func loadProviders() ([]provider.Config, error) {
+func loadProviders() ([]provider.Provider, error) {
 	// Create a new viper instance for provider configs to not conflict with the main config
 	pvp := viper.New()
 	pvp.SetConfigName("providers")
-	pvp.SetConfigType("toml")
 	pvp.AddConfigPath(".")
 	pvp.AddConfigPath("$HOME/.filebutler")
 	pvp.AddConfigPath("/etc/filebutler/")
 	err := pvp.ReadInConfig()
 	if err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			return nil, fmt.Errorf("config file not found")
+			return nil, fmt.Errorf("provider file not found")
 		}
 
-		return nil, fmt.Errorf("error reading config file: %w", err)
+		return nil, fmt.Errorf("error reading provider file: %w", err)
 	}
 
-	var providerConfigs []provider.Config
+	var providers []provider.Provider
 	for id, v := range pvp.AllSettings() {
 		providerType := pvp.GetString(fmt.Sprintf("%s.type", id))
 		if providerType == "" {
-			return nil, fmt.Errorf("provider type is required, missing for: %s", id)
+			return nil, fmt.Errorf("type is required, missing for: %s", id)
 		}
 
 		var cfg provider.Config
 		var err error
 
+		// Parse the provider config based on the provider type
 		switch providerType {
 		case string(provider.ProviderTypeNull):
 			cfg, err = unmarshalProviderCfg[*provider.NullConfig](id, v)
@@ -87,15 +90,30 @@ func loadProviders() ([]provider.Config, error) {
 		default:
 			return nil, fmt.Errorf("unknown provider type: %s", providerType)
 		}
-
 		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal provider config: %w", err)
+			return nil, fmt.Errorf("unable to parse config of provider %s: %w", id, err)
 		}
 
-		providerConfigs = append(providerConfigs, cfg)
+		// Create the provider based on the config
+		// It is kept separate from the above part because IMO it is cleaner
+		var p provider.Provider
+
+		switch cfg := cfg.(type) {
+		case *provider.S3Config:
+			p, err = provider.NewS3Provider(cfg)
+		case *provider.NullConfig:
+			p = provider.NewNullProvider(cfg)
+		case *provider.LogConfig:
+			p = provider.NewLogProvider(cfg)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("unable to create provider %s: %w", id, err)
+		}
+
+		providers = append(providers, p)
 	}
 
-	return providerConfigs, nil
+	return providers, nil
 }
 
 func unmarshalProviderCfg[T provider.Config](id string, v any) (T, error) {

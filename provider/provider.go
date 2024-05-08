@@ -27,6 +27,7 @@ type Config interface {
 }
 
 type Provider interface {
+	Id() string
 	GetObject(ctx context.Context, key string) (io.ReadCloser, error)
 	PutObject(ctx context.Context, key string, data io.Reader) error
 }

@@ -20,7 +20,19 @@ func (n *NullConfig) Id() string {
 	return n.ID
 }
 
-type NullProvider struct{}
+func NewNullProvider(cfg *NullConfig) *NullProvider {
+	return &NullProvider{
+		id: cfg.ID,
+	}
+}
+
+type NullProvider struct {
+	id string
+}
+
+func (n *NullProvider) Id() string {
+	return n.id
+}
 
 func (n *NullProvider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
 	return NullCloser{strings.NewReader("null\n")}, nil
