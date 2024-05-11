@@ -15,25 +15,27 @@ type NullCloser struct {
 func (n NullCloser) Close() error { return nil }
 
 type VoidConfig struct {
-	ID string
-}
-
-func (n *VoidConfig) Id() string {
-	return n.ID
+	ConfigBase
 }
 
 func NewVoidProvider(cfg *VoidConfig) *VoidProvider {
 	return &VoidProvider{
-		id: cfg.ID,
+		id:         cfg.ID,
+		authPlugin: cfg.AuthPlugin,
 	}
 }
 
 type VoidProvider struct {
-	id string
+	id         string
+	authPlugin string
 }
 
 func (n *VoidProvider) Id() string {
 	return n.id
+}
+
+func (n *VoidProvider) AuthPlugin() string {
+	return n.authPlugin
 }
 
 func (n *VoidProvider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {

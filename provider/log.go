@@ -9,25 +9,27 @@ import (
 )
 
 type LogConfig struct {
-	ID string
-}
-
-func (n *LogConfig) Id() string {
-	return n.ID
+	ConfigBase
 }
 
 func NewLogProvider(cfg *LogConfig) *LogProvider {
 	return &LogProvider{
-		id: cfg.ID,
+		id:         cfg.ID,
+		authPlugin: cfg.AuthPlugin,
 	}
 }
 
 type LogProvider struct {
-	id string
+	id         string
+	authPlugin string
 }
 
 func (n *LogProvider) Id() string {
 	return n.id
+}
+
+func (n *LogProvider) AuthPlugin() string {
+	return n.authPlugin
 }
 
 func (n *LogProvider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {

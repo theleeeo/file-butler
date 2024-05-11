@@ -15,14 +15,10 @@ import (
 var _ Provider = &S3Provider{}
 
 type S3Config struct {
-	ID      string
+	ConfigBase
 	Bucket  string
 	Region  string
 	Profile string
-}
-
-func (n *S3Config) Id() string {
-	return n.ID
 }
 
 func NewS3Provider(cfg *S3Config) (*S3Provider, error) {
@@ -40,6 +36,7 @@ func NewS3Provider(cfg *S3Config) (*S3Provider, error) {
 
 	return &S3Provider{
 		id:         cfg.ID,
+		authPlugin: cfg.AuthPlugin,
 		bucketName: cfg.Bucket,
 		client:     client,
 	}, nil
@@ -47,6 +44,7 @@ func NewS3Provider(cfg *S3Config) (*S3Provider, error) {
 
 type S3Provider struct {
 	id         string
+	authPlugin string
 	bucketName string
 
 	client *s3.Client
@@ -54,6 +52,10 @@ type S3Provider struct {
 
 func (s *S3Provider) Id() string {
 	return s.id
+}
+
+func (s *S3Provider) AuthPlugin() string {
+	return s.authPlugin
 }
 
 func (s *S3Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {

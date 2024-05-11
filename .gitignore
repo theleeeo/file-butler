@@ -31,3 +31,5 @@ config.*
 providers.*
 *.providers.*
 !providers.example.*
+
+plugins/

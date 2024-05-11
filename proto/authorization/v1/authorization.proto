@@ -1,0 +1,28 @@
+syntax = "proto3";
+package authorization.v1;
+
+option go_package = "github.com/theleeeo/file-butler/authorization";
+
+service AuthorizationService {
+  rpc Authorize(AuthorizeRequest) returns (AuthorizeResponse);
+}
+
+enum RequestType {
+  REQUEST_TYPE_UNSPECIFIED = 0;
+  REQUEST_TYPE_DOWNLOAD = 1;
+  REQUEST_TYPE_UPLOAD = 2;
+}
+
+message AuthorizeRequest {
+  string key = 1;
+  string provider = 2;
+  RequestType request_type = 3;
+  repeated Header headers = 4;
+}
+
+message Header {
+  string key = 1;
+  repeated string values = 2;
+}
+
+message AuthorizeResponse {}

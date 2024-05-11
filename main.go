@@ -9,9 +9,30 @@ import (
 	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
+	authPlugin "github.com/theleeeo/file-butler/authorization/plugin"
 	"github.com/theleeeo/file-butler/provider"
 	"github.com/theleeeo/file-butler/server"
 )
+
+func loadPlugins() ([]authPlugin.Plugin, error) {
+	var cfgs []authPlugin.Config
+	err := viper.UnmarshalKey("auth-plugins", &cfgs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse configs: %w", err)
+	}
+
+	var plugins []authPlugin.Plugin
+
+	for _, cfg := range cfgs {
+		pg, err := authPlugin.NewPlugin(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create plugin %s: %w", cfg.Name, err)
+		}
+		plugins = append(plugins, pg)
+	}
+
+	return plugins, nil
+}
 
 func main() {
 	viper.SetConfigName("config")
@@ -37,10 +58,20 @@ func main() {
 		return
 	}
 
+	plugins, err := loadPlugins()
+	if err != nil {
+		color.Red("ERROR: %s", err)
+		return
+	}
+	for _, p := range plugins {
+		defer p.Stop()
+	}
+
 	srv, err := server.NewServer(server.Config{
-		Addr:         viper.GetString("server.addr"),
-		AllowRawBody: viper.GetBool("server.allow_raw_body"),
-	})
+		Addr:              viper.GetString("server.addr"),
+		AllowRawBody:      viper.GetBool("server.allow_raw_body"),
+		DefaultAuthPlugin: viper.GetString("server.default_auth_plugin"),
+	}, plugins)
 	if err != nil {
 		color.Red("ERROR creating server: %s", err)
 		return
@@ -167,7 +198,7 @@ ProviderLoop:
 func unmarshalProviderCfg[T provider.Config](id string, v any) (T, error) {
 	var cfg T
 
-	vMap, ok := v.(map[string]interface{})
+	vMap, ok := v.(map[string]any)
 	if !ok {
 		return cfg, fmt.Errorf("invalid config type: %T", v)
 	}
