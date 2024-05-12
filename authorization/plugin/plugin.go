@@ -72,7 +72,7 @@ func NewPlugin(cfg Config) (Plugin, error) {
 		client := plugin.NewClient(&plugin.ClientConfig{
 			HandshakeConfig:  shared.Handshake,
 			Plugins:          shared.PluginMap,
-			Cmd:              exec.Command(cfg.Cmd[0], args...),
+			Cmd:              exec.Command(cfg.Cmd[0], args...), //nolint:gosec // This is specified at startup. We trust a root server user.
 			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 			Logger:           hclog.New(&hclog.LoggerOptions{Level: hclog.Debug}),
 			SyncStdout:       &pluginLogWriter{cfg.Name, os.Stdout},
@@ -90,7 +90,10 @@ func NewPlugin(cfg Config) (Plugin, error) {
 			return nil, fmt.Errorf("failed to dispense plugin: %w", err)
 		}
 
-		auth := raw.(shared.Authorizer)
+		auth, ok := raw.(shared.Authorizer)
+		if !ok {
+			return nil, fmt.Errorf("plugin does not implement Authorizer")
+		}
 
 		pg = &pluginClientWrapper{
 			pluginBase: pluginBase{

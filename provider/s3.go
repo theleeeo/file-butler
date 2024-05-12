@@ -2,8 +2,8 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"log"
 	"strings"
 	"time"
 
@@ -26,7 +26,7 @@ func NewS3Provider(cfg *S3Config) (*S3Provider, error) {
 
 	clientCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region), config.WithSharedConfigProfile(cfg.Profile))
 	if err != nil {
-		log.Fatalf("unable to load SDK config, %v", err)
+		return nil, fmt.Errorf("unable to load SDK config, %w", err)
 	}
 
 	client := s3.NewFromConfig(clientCfg)

@@ -1,0 +1,61 @@
+linters:
+  enable:
+    # - revive
+    - bodyclose
+    - goconst
+    - gofmt
+    - goimports
+    - gosec
+    - misspell
+    - errorlint
+    - errcheck
+    - errchkjson
+    - contextcheck
+    - staticcheck
+    - govet
+    - gosimple
+    - ineffassign
+    - unused
+    - asasalint
+    - asciicheck
+    - bidichk
+    - durationcheck
+    - gocheckcompilerdirectives
+    - gosec
+    - noctx
+    - dupword
+    - misspell
+    - gocritic
+    - errname
+    - nilerr
+    - unparam
+    - nolintlint
+
+    # - forcetypeassert
+  fast: true
+
+linters-settings:
+  goconst:
+    min-occurrences: 4
+  gocritic:
+    disabled-checks:
+      - ifElseChain
+    # enabled-tags:
+    #   - diagnostic
+    #   - experimental
+    #   - opinionated
+    #   - performance
+    #   - style
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+
+run:
+  skip-files:
+    - ".*test\\.go"
+  skip-dirs:
+    - "tests"
+    - "dev"

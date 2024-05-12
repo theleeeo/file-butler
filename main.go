@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -44,7 +45,8 @@ func main() {
 	viper.AddConfigPath("/etc/filebutler/")
 	err := viper.ReadInConfig()
 	if err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		var notFoundErr viper.ConfigFileNotFoundError
+		if errors.As(err, &notFoundErr) {
 			color.Red("config file not found")
 			return
 		}
@@ -168,7 +170,8 @@ func loadProviders(pvp *viper.Viper) ([]provider.Provider, error) {
 	pvp.AddConfigPath("/etc/filebutler/")
 	err := pvp.ReadInConfig()
 	if err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		var notFoundErr viper.ConfigFileNotFoundError
+		if errors.As(err, &notFoundErr) {
 			return nil, fmt.Errorf("provider file not found")
 		}
 

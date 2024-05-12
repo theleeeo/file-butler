@@ -17,11 +17,11 @@ func InternalErrorRedacter() func(http.Handler) http.Handler {
 			h.ServeHTTP(respCatcher, r)
 
 			if respCatcher.Code == http.StatusInternalServerError {
-				responseId := rand.Intn(1000000)
+				responseId := rand.Intn(1000000) //nolint:gosec // This is not for security purposes, it does not have to be cryptographically secure
 
 				copyHeaders(w.Header(), respCatcher.Header())
 				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(fmt.Sprintf("internal error, id: %d", responseId)))
+				_, _ = w.Write([]byte(fmt.Sprintf("internal error, id: %d", responseId)))
 
 				log.Printf("internal error: %s, id: %d, path: %s", removeTrailingNewline(respCatcher.Body.String()), responseId, r.URL.Path)
 				return
@@ -29,7 +29,7 @@ func InternalErrorRedacter() func(http.Handler) http.Handler {
 
 			copyHeaders(w.Header(), respCatcher.Header())
 			w.WriteHeader(respCatcher.Code)
-			w.Write(respCatcher.Body.Bytes())
+			_, _ = w.Write(respCatcher.Body.Bytes())
 		})
 	}
 }

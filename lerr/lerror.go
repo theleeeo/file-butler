@@ -37,7 +37,7 @@ func Wrap(message string, err error, code int) *DetailedError {
 // Code returns the code of the error if it is a DetailedError.
 // Otherwise returns the UnknownErrorCode.
 func Code(err error) int {
-	if e, ok := err.(*DetailedError); ok {
+	if e, ok := err.(*DetailedError); ok { //nolint:errorlint // We only want to check if the direct errors. A DetailedError should not be wrapped in a non-DetailedError and there can be unintended mistakes made if we allow it.
 		return e.code
 	}
 	return UnknownErrorCode
