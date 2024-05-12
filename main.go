@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
@@ -63,9 +66,6 @@ func main() {
 		color.Red("ERROR: %s", err)
 		return
 	}
-	for _, p := range plugins {
-		defer p.Stop()
-	}
 
 	srv, err := server.NewServer(server.Config{
 		Addr:              viper.GetString("server.addr"),
@@ -87,7 +87,33 @@ func main() {
 	pvp.WatchConfig()
 	pvp.OnConfigChange(reloadProvidersFunc(pvp, srv))
 
-	log.Println(srv.Run(context.Background()))
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		signalChan := make(chan os.Signal, 1)
+		signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+
+		<-signalChan
+		log.Println("Stopping server")
+		cancel()
+
+		// If another signal is received, force kill the server
+		<-signalChan
+		log.Println("Force killing")
+		os.Exit(1)
+	}()
+
+	if err := srv.Run(ctx); err != nil {
+		color.Red("ERROR running server: %s", err)
+	}
+
+	log.Println("Server stopped")
+
+	for _, p := range plugins {
+		if err := p.Stop(); err != nil {
+			color.Red("ERROR stopping plugin %s: %s", p.Name(), err)
+		}
+	}
 }
 
 func reloadProvidersFunc(pvp *viper.Viper, srv *server.Server) func(fsnotify.Event) {

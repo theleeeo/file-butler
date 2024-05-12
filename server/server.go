@@ -167,9 +167,22 @@ func (s *Server) getProvider(id string) provider.Provider {
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	go func() {
+		<-ctx.Done()
+
+		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+
+		if err := s.srv.Shutdown(shutdownCtx); err != nil {
+			log.Println("Error shutting down server:", err)
+		}
+	}()
+
 	log.Printf("Server is listening on %s", s.srv.Addr)
 	if err := s.srv.ListenAndServe(); err != nil {
-		return err
+		if !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
 	}
 
 	return nil

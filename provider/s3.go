@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -22,8 +21,6 @@ type S3Config struct {
 }
 
 func NewS3Provider(cfg *S3Config) (*S3Provider, error) {
-	fmt.Println(cfg)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
