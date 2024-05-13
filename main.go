@@ -18,26 +18,6 @@ import (
 	"github.com/theleeeo/file-butler/server"
 )
 
-func loadPlugins() ([]authPlugin.Plugin, error) {
-	var cfgs []authPlugin.Config
-	err := viper.UnmarshalKey("auth-plugins", &cfgs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse configs: %w", err)
-	}
-
-	var plugins []authPlugin.Plugin
-
-	for _, cfg := range cfgs {
-		pg, err := authPlugin.NewPlugin(cfg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create plugin %s: %w", cfg.Name, err)
-		}
-		plugins = append(plugins, pg)
-	}
-
-	return plugins, nil
-}
-
 func main() {
 	viper.SetConfigName("config")
 	viper.AddConfigPath(".")
@@ -116,6 +96,26 @@ func main() {
 			color.Red("ERROR stopping plugin %s: %s", p.Name(), err)
 		}
 	}
+}
+
+func loadPlugins() ([]authPlugin.Plugin, error) {
+	var cfgs []authPlugin.Config
+	err := viper.UnmarshalKey("auth-plugins", &cfgs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse configs: %w", err)
+	}
+
+	var plugins []authPlugin.Plugin
+
+	for _, cfg := range cfgs {
+		pg, err := authPlugin.NewPlugin(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create plugin %s: %w", cfg.Name, err)
+		}
+		plugins = append(plugins, pg)
+	}
+
+	return plugins, nil
 }
 
 func reloadProvidersFunc(pvp *viper.Viper, srv *server.Server) func(fsnotify.Event) {

@@ -31,6 +31,16 @@ type Config struct {
 	DefaultAuthPlugin string
 }
 
+func defaultAuthPluginExists(plugins []authPlugin.Plugin, defaultAuthPlugin string) bool {
+	for _, p := range plugins {
+		if p.Name() == defaultAuthPlugin {
+			return true
+		}
+	}
+
+	return false
+}
+
 // NewServer creates a new server instance
 // No providers are registered by default, they must be registered using the RegisterProvider method
 func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
@@ -38,8 +48,16 @@ func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
 		return nil, errors.New("address is required")
 	}
 
+	if len(plugins) == 0 {
+		return nil, errors.New("at least one auth plugin is required")
+	}
+
 	if serverCfg.DefaultAuthPlugin == "" {
 		return nil, errors.New("default auth plugin is required")
+	}
+
+	if !defaultAuthPluginExists(plugins, serverCfg.DefaultAuthPlugin) {
+		return nil, errors.New("default auth plugin not found")
 	}
 
 	if err := validateUniquePluginNames(plugins); err != nil {
@@ -57,13 +75,12 @@ func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
 	mux.HandleFunc("/{provider}/{key}", s.handleUpload)
 	mux.HandleFunc("GET /{provider}/{key}", s.handleDownload)
 
-	srv := &http.Server{
+	s.srv = &http.Server{
 		Addr:              serverCfg.Addr,
 		Handler:           InternalErrorRedacter()(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       10 * time.Second,
 	}
-	s.srv = srv
 
 	return s, nil
 }

@@ -40,6 +40,8 @@ type Config struct {
 
 	// Name is the unique name of the plugin used to identify it.
 	Name string
+
+	LogLevel hclog.Level
 }
 
 type pluginLogWriter struct {
@@ -61,6 +63,10 @@ func NewPlugin(cfg Config) (Plugin, error) {
 		return nil, fmt.Errorf("name must be set")
 	}
 
+	if cfg.LogLevel == hclog.NoLevel {
+		cfg.LogLevel = hclog.Info
+	}
+
 	var pg Plugin
 
 	if len(cfg.Cmd) != 0 {
@@ -74,7 +80,7 @@ func NewPlugin(cfg Config) (Plugin, error) {
 			Plugins:          shared.PluginMap,
 			Cmd:              exec.Command(cfg.Cmd[0], args...), //nolint:gosec // This is specified at startup. We trust a root server user.
 			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-			Logger:           hclog.New(&hclog.LoggerOptions{Level: hclog.Debug}),
+			Logger:           hclog.New(&hclog.LoggerOptions{Level: cfg.LogLevel}),
 			SyncStdout:       &pluginLogWriter{cfg.Name, os.Stdout},
 			SyncStderr:       &pluginLogWriter{cfg.Name, os.Stderr},
 		})
@@ -134,6 +140,11 @@ func NewPlugin(cfg Config) (Plugin, error) {
 		case "only-download":
 			pg = &pluginBase{
 				Authorizer: &OnlyDownloadPlugin{},
+				name:       cfg.Name,
+			}
+		case "allow-all":
+			pg = &pluginBase{
+				Authorizer: NewAllowAllPlugin(),
 				name:       cfg.Name,
 			}
 		default:
