@@ -6,14 +6,6 @@ import (
 	"strings"
 )
 
-// NullCloser is a ReadCloser that does nothing when closed
-// It is used to wrap a Reader that does not need to be closed
-type NullCloser struct {
-	io.Reader
-}
-
-func (n NullCloser) Close() error { return nil }
-
 type VoidConfig struct {
 	ConfigBase
 }
@@ -39,7 +31,7 @@ func (n *VoidProvider) AuthPlugin() string {
 }
 
 func (n *VoidProvider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
-	return NullCloser{strings.NewReader("null\n")}, nil
+	return io.NopCloser(strings.NewReader("null\n")), nil
 }
 
 func (n *VoidProvider) PutObject(ctx context.Context, key string, data io.Reader) error {

@@ -34,7 +34,7 @@ func (n *LogProvider) AuthPlugin() string {
 
 func (n *LogProvider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
 	log.Printf("GetObject %s", key)
-	return NullCloser{strings.NewReader("Hello World!\n")}, nil
+	return io.NopCloser(strings.NewReader("Hello World!\n")), nil
 }
 
 func (n *LogProvider) PutObject(ctx context.Context, key string, data io.Reader) error {
