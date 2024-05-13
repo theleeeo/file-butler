@@ -147,8 +147,4 @@ func Test_Upload(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	d, err := io.ReadAll(resp.Body)
-	fmt.Println(string(d))
-	// assert.NoError(t, err)
-	// assert.Equal(t, "hello", string(d))
 }

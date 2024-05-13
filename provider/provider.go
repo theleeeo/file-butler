@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("resource not found")
-	ErrDenied   = errors.New("access denied")
+	ErrNotFound  = errors.New("resource not found")
+	ErrDenied    = errors.New("access denied")
+	ErrNoPresign = errors.New("presigning is not allowed for this provider")
 )
 
 type ProviderType string
@@ -44,4 +45,15 @@ type Provider interface {
 
 	GetObject(ctx context.Context, key string) (io.ReadCloser, error)
 	PutObject(ctx context.Context, key string, data io.Reader) error
+}
+
+type PresignOperation string
+
+const (
+	PresignOperationDownload PresignOperation = "download"
+	PresignOperationUpload   PresignOperation = "upload"
+)
+
+type Presigner interface {
+	PresignURL(ctx context.Context, key string, direction PresignOperation) (string, error)
 }

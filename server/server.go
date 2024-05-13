@@ -75,6 +75,8 @@ func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
 	mux.HandleFunc("/{provider}/{key}", s.handleUpload)
 	mux.HandleFunc("GET /{provider}/{key}", s.handleDownload)
 
+	mux.HandleFunc("GET /presign/{provider}/{key}", s.handlePresign)
+
 	s.srv = &http.Server{
 		Addr:              serverCfg.Addr,
 		Handler:           InternalErrorRedacter()(mux),
@@ -224,7 +226,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.authorizeRequest(r, key, p); err != nil {
+	if err := s.authorizeRequest(r.Context(), r.Method, r.Header, key, p); err != nil {
 		http.Error(w, err.Error(), lerr.Code(err))
 		return
 	}
@@ -295,7 +297,7 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.authorizeRequest(r, key, p); err != nil {
+	if err := s.authorizeRequest(r.Context(), r.Method, r.Header, key, p); err != nil {
 		http.Error(w, err.Error(), lerr.Code(err))
 		return
 	}
@@ -321,7 +323,7 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) authorizeRequest(r *http.Request, key string, p provider.Provider) error {
+func (s *Server) authorizeRequest(ctx context.Context, method string, headers map[string][]string, key string, p provider.Provider) error {
 	authPluginName := p.AuthPlugin()
 	if authPluginName == "" {
 		authPluginName = s.defaultAuthPlugin
@@ -332,18 +334,18 @@ func (s *Server) authorizeRequest(r *http.Request, key string, p provider.Provid
 		return lerr.New("no auth plugin found for provider "+p.Id(), http.StatusInternalServerError)
 	}
 
-	var headers []*authorization.Header
-	for k, v := range r.Header {
-		headers = append(headers, &authorization.Header{
+	var authHeaderMap []*authorization.Header
+	for k, v := range headers {
+		authHeaderMap = append(authHeaderMap, &authorization.Header{
 			Key:    k,
 			Values: v,
 		})
 	}
 
 	var reqType authorization.RequestType
-	if r.Method == "GET" {
+	if method == "GET" {
 		reqType = authorization.RequestType_REQUEST_TYPE_DOWNLOAD
-	} else if r.Method == "PUT" || r.Method == "POST" {
+	} else if method == "PUT" || method == "POST" {
 		reqType = authorization.RequestType_REQUEST_TYPE_UPLOAD
 	} else {
 		return lerr.New("unsupported request method", http.StatusMethodNotAllowed)
@@ -353,10 +355,10 @@ func (s *Server) authorizeRequest(r *http.Request, key string, p provider.Provid
 		Key:         key,
 		Provider:    p.Id(),
 		RequestType: reqType,
-		Headers:     headers,
+		Headers:     authHeaderMap,
 	}
 
-	if err := authPlugin.Authorize(r.Context(), req); err != nil {
+	if err := authPlugin.Authorize(ctx, req); err != nil {
 		s, ok := status.FromError(err)
 		if !ok {
 			return lerr.New(fmt.Sprintf("plugin error not a grpc status! error=%s", err.Error()), http.StatusInternalServerError)
@@ -374,4 +376,70 @@ func (s *Server) authorizeRequest(r *http.Request, key string, p provider.Provid
 	}
 
 	return nil
+}
+
+func (s *Server) handlePresign(w http.ResponseWriter, r *http.Request) {
+	providerName := r.PathValue("provider")
+	p := s.getProvider(providerName)
+	if p == nil {
+		http.Error(w, "provider not found", http.StatusNotFound)
+		return
+	}
+
+	presigner, ok := p.(provider.Presigner)
+	if !ok {
+		http.Error(w, provider.ErrNoPresign.Error(), http.StatusNotFound)
+		return
+	}
+
+	key := r.PathValue("key")
+	if key == "" {
+		http.Error(w, "key is required", http.StatusBadRequest)
+		return
+	}
+
+	op := r.URL.Query().Get("op")
+	if op == "" {
+		http.Error(w, "presign operation is required", http.StatusBadRequest)
+		return
+	}
+
+	var presignOp provider.PresignOperation
+	// authMethod is used for mapping into the correct operation by the authorizeRequest function.
+	// This is to allow the same authorization logic to be used for both presign and regular requests
+	var authMethod string
+	switch op {
+	case "download":
+		presignOp = provider.PresignOperationDownload
+		authMethod = "GET"
+	case "upload":
+		presignOp = provider.PresignOperationUpload
+		authMethod = "PUT"
+	default:
+		http.Error(w, fmt.Sprint("unsupported presign operation: ", op), http.StatusBadRequest)
+		return
+	}
+
+	if err := s.authorizeRequest(r.Context(), authMethod, r.Header, key, p); err != nil {
+		http.Error(w, err.Error(), lerr.Code(err))
+		return
+	}
+
+	url, err := presigner.PresignURL(r.Context(), key, presignOp)
+	if err != nil {
+		if errors.Is(err, provider.ErrDenied) {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+
+		if errors.Is(err, provider.ErrNoPresign) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, _ = w.Write([]byte(url))
 }
