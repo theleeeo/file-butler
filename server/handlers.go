@@ -70,7 +70,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key string) error {
 	dataSrc, err := getDataSource(r, s.allowRawBody)
 	if err != nil {
-		return lerr.Wrap("error getting data source", err, http.StatusBadRequest)
+		return err
 	}
 	defer dataSrc.Close()
 
@@ -91,23 +91,23 @@ func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "multipart/form-data") {
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			log.Println("Error parsing multipart form:", err)
+			log.Println("error parsing multipart form:", err)
 
 			return nil, lerr.Wrap("error parsing multipart form:", err, http.StatusBadRequest)
 		}
 
 		file, _, err := r.FormFile("file")
 		if err != nil {
-			log.Println("Error getting file from form:", err)
+			log.Println("error getting file from form:", err)
 
 			return nil, lerr.Wrap("error getting file from form:", err, http.StatusBadRequest)
 		}
 		data = file
 	} else {
 		if !allowRawBody {
-			log.Println("Attempted to upload raw body data when it is not allowed")
+			log.Println("attempted to upload raw body data when it is not allowed")
 
-			return nil, lerr.New("raw body uploads are not allowed, use multipart form data", http.StatusBadRequest)
+			return nil, lerr.New("raw body uploads are not allowed, use multipart form data", http.StatusUnsupportedMediaType)
 		}
 
 		data = r.Body

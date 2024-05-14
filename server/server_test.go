@@ -182,3 +182,47 @@ func Test_Upload(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 }
+
+func Test_Upload_DontAllowRawBody(t *testing.T) {
+	plg, err := authPlugin.NewPlugin(authPlugin.Config{
+		Name:    "default",
+		BuiltIn: "allow-all",
+	})
+	assert.NoError(t, err)
+
+	port, err := getValidPort()
+	assert.NoError(t, err)
+
+	srv, err := NewServer(Config{
+		Addr:              fmt.Sprint("localhost:", port),
+		DefaultAuthPlugin: "default",
+		AllowRawBody:      false,
+	}, []authPlugin.Plugin{plg})
+	assert.NoError(t, err)
+
+	prov := mocks.NewProvider(provider.ConfigBase{ID: "mock"})
+	err = srv.RegisterProvider(prov)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		assert.Nil(t, srv.Run(ctx))
+	}()
+
+	t.Run("Put object", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/mock/123", port), strings.NewReader("hello"))
+		assert.NoError(t, err)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusUnsupportedMediaType, resp.StatusCode)
+
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "raw body uploads are not allowed, use multipart form data\n", string(d))
+	})
+}
