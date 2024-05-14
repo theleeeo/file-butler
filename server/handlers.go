@@ -179,6 +179,11 @@ func (s *Server) authorizeRequest(ctx context.Context, reqType authorization.Req
 }
 
 func (s *Server) handlePresign(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "unsupported method", http.StatusMethodNotAllowed)
+		return
+	}
+
 	providerName := r.PathValue("provider")
 	p := s.getProvider(providerName)
 	if p == nil {
@@ -192,7 +197,7 @@ func (s *Server) handlePresign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := r.PathValue("key")
+	key := strings.TrimPrefix(r.URL.Path, "/presign/"+providerName+"/")
 	if key == "" {
 		http.Error(w, "key is required", http.StatusBadRequest)
 		return

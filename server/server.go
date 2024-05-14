@@ -68,7 +68,7 @@ func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/{provider}/", s.handleFile)
 
-	mux.HandleFunc("GET /presign/{provider}/{key}", s.handlePresign)
+	mux.HandleFunc("/presign/{provider}/", s.handlePresign)
 
 	s.srv = &http.Server{
 		Addr:              serverCfg.Addr,
