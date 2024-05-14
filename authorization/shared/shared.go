@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/theleeeo/file-butler/authorization/v1"
+	authorization "github.com/theleeeo/file-butler/authorization/v1"
 )
 
 const (

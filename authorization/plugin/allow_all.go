@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/theleeeo/file-butler/authorization/v1"
+	authorization "github.com/theleeeo/file-butler/authorization/v1"
 )
 
 func NewAllowAllPlugin() *AllowAllPlugin {

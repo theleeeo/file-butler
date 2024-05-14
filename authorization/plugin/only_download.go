@@ -3,7 +3,7 @@ package authorization
 import (
 	"context"
 
-	"github.com/theleeeo/file-butler/authorization/v1"
+	authorization "github.com/theleeeo/file-butler/authorization/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

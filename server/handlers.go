@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/theleeeo/file-butler/authorization/v1"
+	authorization "github.com/theleeeo/file-butler/authorization/v1"
 	"github.com/theleeeo/file-butler/lerr"
 	"github.com/theleeeo/file-butler/provider"
 	"google.golang.org/grpc/codes"

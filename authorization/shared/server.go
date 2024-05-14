@@ -3,7 +3,7 @@ package shared
 import (
 	"context"
 
-	"github.com/theleeeo/file-butler/authorization/v1"
+	authorization "github.com/theleeeo/file-butler/authorization/v1"
 )
 
 type GRPCServer struct {
