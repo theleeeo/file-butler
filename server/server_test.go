@@ -1,4 +1,4 @@
-package server_test
+package server
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	authPlugin "github.com/theleeeo/file-butler/authorization/plugin"
 	"github.com/theleeeo/file-butler/mocks"
 	"github.com/theleeeo/file-butler/provider"
-	"github.com/theleeeo/file-butler/server"
 )
 
 func getValidPort() (int, error) {
@@ -42,7 +41,7 @@ func Test_CreateServer(t *testing.T) {
 	port, err := getValidPort()
 	assert.NoError(t, err)
 
-	srv, err := server.NewServer(server.Config{
+	srv, err := NewServer(Config{
 		Addr:              fmt.Sprint("localhost:", port),
 		DefaultAuthPlugin: "default",
 	}, []authPlugin.Plugin{plg})
@@ -75,7 +74,7 @@ func Test_Download(t *testing.T) {
 	port, err := getValidPort()
 	assert.NoError(t, err)
 
-	srv, err := server.NewServer(server.Config{
+	srv, err := NewServer(Config{
 		Addr:              fmt.Sprint("localhost:", port),
 		DefaultAuthPlugin: "default",
 	}, []authPlugin.Plugin{plg})
@@ -92,21 +91,41 @@ func Test_Download(t *testing.T) {
 		assert.Nil(t, srv.Run(ctx))
 	}()
 
-	prov.On("GetObject", mock.Anything, "123").Return(
-		"hello",
-		nil)
+	t.Run("Get object", func(t *testing.T) {
+		prov.On("GetObject", mock.Anything, "123").Return(
+			"hello",
+			nil)
 
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/mock/123", port), nil)
-	assert.NoError(t, err)
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/mock/123", port), nil)
+		assert.NoError(t, err)
 
-	client := http.Client{}
-	resp, err := client.Do(req)
-	assert.NoError(t, err)
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	d, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.Equal(t, "hello", string(d))
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "hello", string(d))
+	})
+
+	t.Run("Multi-slash key", func(t *testing.T) {
+		prov.On("GetObject", mock.Anything, "123/456/abc").Return(
+			"hello",
+			nil)
+
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/mock/123/456/abc", port), nil)
+		assert.NoError(t, err)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "hello", string(d))
+	})
 }
 
 func Test_Upload(t *testing.T) {
@@ -119,7 +138,7 @@ func Test_Upload(t *testing.T) {
 	port, err := getValidPort()
 	assert.NoError(t, err)
 
-	srv, err := server.NewServer(server.Config{
+	srv, err := NewServer(Config{
 		Addr:              fmt.Sprint("localhost:", port),
 		DefaultAuthPlugin: "default",
 		AllowRawBody:      true,
@@ -137,14 +156,29 @@ func Test_Upload(t *testing.T) {
 		assert.Nil(t, srv.Run(ctx))
 	}()
 
-	prov.On("PutObject", mock.Anything, "123", []byte("hello")).Return(nil)
+	t.Run("Put object", func(t *testing.T) {
+		prov.On("PutObject", mock.Anything, "123", []byte("hello")).Return(nil)
 
-	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/mock/123", port), strings.NewReader("hello"))
-	assert.NoError(t, err)
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/mock/123", port), strings.NewReader("hello"))
+		assert.NoError(t, err)
 
-	client := http.Client{}
-	resp, err := client.Do(req)
-	assert.NoError(t, err)
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("Multi-slash key", func(t *testing.T) {
+		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello")).Return(nil)
+
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/mock/123/456/abc", port), strings.NewReader("hello"))
+		assert.NoError(t, err)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
 }

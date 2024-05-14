@@ -72,8 +72,7 @@ func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/{provider}/{key}", s.handleUpload)
-	mux.HandleFunc("GET /{provider}/{key}", s.handleDownload)
+	mux.HandleFunc("/{provider}/", s.handleFile)
 
 	mux.HandleFunc("GET /presign/{provider}/{key}", s.handlePresign)
 
@@ -207,10 +206,15 @@ func (s *Server) Run(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" && r.Method != "PUT" {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
+func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
+	var reqType authorization.RequestType
+	switch r.Method {
+	case "GET":
+		reqType = authorization.RequestType_REQUEST_TYPE_DOWNLOAD
+	case "PUT", "POST":
+		reqType = authorization.RequestType_REQUEST_TYPE_UPLOAD
+	default:
+		http.Error(w, "unsupported method", http.StatusMethodNotAllowed)
 	}
 
 	providerName := r.PathValue("provider")
@@ -220,35 +224,55 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := r.PathValue("key")
+	key := strings.TrimPrefix(r.URL.Path, "/"+providerName+"/")
 	if key == "" {
 		http.Error(w, "key is required", http.StatusBadRequest)
 		return
 	}
 
-	if err := s.authorizeRequest(r.Context(), r.Method, r.Header, key, p); err != nil {
+	if err := s.authorizeRequest(r.Context(), reqType, r.Header, key, p); err != nil {
 		http.Error(w, err.Error(), lerr.Code(err))
 		return
 	}
 
-	dataSrc, err := getDataSource(r, s.allowRawBody)
-	if err != nil {
-		http.Error(w, err.Error(), lerr.Code(err))
-		return
-	}
-	defer dataSrc.Close()
-
-	if err := p.PutObject(r.Context(), key, dataSrc); err != nil {
-		if errors.Is(err, provider.ErrDenied) {
-			http.Error(w, err.Error(), http.StatusForbidden)
+	if reqType == authorization.RequestType_REQUEST_TYPE_DOWNLOAD {
+		data, err := s.handleDownload(r, p, key)
+		if err != nil {
+			http.Error(w, err.Error(), lerr.Code(err))
 			return
 		}
 
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		defer data.Close()
+		if _, err := io.Copy(w, data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		return
 	}
 
+	if err := s.handleUpload(r, p, key); err != nil {
+		http.Error(w, err.Error(), lerr.Code(err))
+	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key string) error {
+	dataSrc, err := getDataSource(r, s.allowRawBody)
+	if err != nil {
+		return lerr.Wrap("error getting data source", err, http.StatusBadRequest)
+	}
+	defer dataSrc.Close()
+
+	if err := prov.PutObject(r.Context(), key, dataSrc); err != nil {
+		if errors.Is(err, provider.ErrDenied) {
+			return lerr.Wrap("error uploading object", err, http.StatusForbidden)
+		}
+
+		return lerr.New(err.Error(), http.StatusInternalServerError)
+	}
+
+	return nil
 }
 
 func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
@@ -282,48 +306,23 @@ func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
 	return data, nil
 }
 
-func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
-	providerName := r.PathValue("provider")
-
-	p := s.getProvider(providerName)
-	if p == nil {
-		http.Error(w, "provider not found", http.StatusNotFound)
-		return
-	}
-
-	key := r.PathValue("key")
-	if key == "" {
-		http.Error(w, "key is required", http.StatusBadRequest)
-		return
-	}
-
-	if err := s.authorizeRequest(r.Context(), r.Method, r.Header, key, p); err != nil {
-		http.Error(w, err.Error(), lerr.Code(err))
-		return
-	}
-
-	data, err := p.GetObject(r.Context(), key)
+func (s *Server) handleDownload(r *http.Request, prov provider.Provider, key string) (io.ReadCloser, error) {
+	data, err := prov.GetObject(r.Context(), key)
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
+			return nil, lerr.New(err.Error(), http.StatusNotFound)
 		}
 		if errors.Is(err, provider.ErrDenied) {
-			http.Error(w, err.Error(), http.StatusForbidden)
+			return nil, lerr.New(err.Error(), http.StatusForbidden)
 		}
 
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, lerr.New(err.Error(), http.StatusInternalServerError)
 	}
 
-	defer data.Close()
-	if _, err := io.Copy(w, data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	return data, nil
 }
 
-func (s *Server) authorizeRequest(ctx context.Context, method string, headers map[string][]string, key string, p provider.Provider) error {
+func (s *Server) authorizeRequest(ctx context.Context, reqType authorization.RequestType, headers map[string][]string, key string, p provider.Provider) error {
 	authPluginName := p.AuthPlugin()
 	if authPluginName == "" {
 		authPluginName = s.defaultAuthPlugin
@@ -340,15 +339,6 @@ func (s *Server) authorizeRequest(ctx context.Context, method string, headers ma
 			Key:    k,
 			Values: v,
 		})
-	}
-
-	var reqType authorization.RequestType
-	if method == "GET" {
-		reqType = authorization.RequestType_REQUEST_TYPE_DOWNLOAD
-	} else if method == "PUT" || method == "POST" {
-		reqType = authorization.RequestType_REQUEST_TYPE_UPLOAD
-	} else {
-		return lerr.New("unsupported request method", http.StatusMethodNotAllowed)
 	}
 
 	req := &authorization.AuthorizeRequest{
@@ -405,22 +395,20 @@ func (s *Server) handlePresign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var presignOp provider.PresignOperation
-	// authMethod is used for mapping into the correct operation by the authorizeRequest function.
-	// This is to allow the same authorization logic to be used for both presign and regular requests
-	var authMethod string
+	var reqType authorization.RequestType
 	switch op {
 	case "download":
 		presignOp = provider.PresignOperationDownload
-		authMethod = "GET"
+		reqType = authorization.RequestType_REQUEST_TYPE_DOWNLOAD
 	case "upload":
 		presignOp = provider.PresignOperationUpload
-		authMethod = "PUT"
+		reqType = authorization.RequestType_REQUEST_TYPE_UPLOAD
 	default:
 		http.Error(w, fmt.Sprint("unsupported presign operation: ", op), http.StatusBadRequest)
 		return
 	}
 
-	if err := s.authorizeRequest(r.Context(), authMethod, r.Header, key, p); err != nil {
+	if err := s.authorizeRequest(r.Context(), reqType, r.Header, key, p); err != nil {
 		http.Error(w, err.Error(), lerr.Code(err))
 		return
 	}
