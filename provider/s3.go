@@ -89,11 +89,12 @@ func (s *S3Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, 
 	return output.Body, nil
 }
 
-func (s *S3Provider) PutObject(ctx context.Context, key string, data io.Reader) error {
+func (s *S3Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64) error {
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: &s.bucketName,
-		Key:    &key,
-		Body:   data,
+		Bucket:        &s.bucketName,
+		Key:           &key,
+		Body:          data,
+		ContentLength: &length,
 	})
 	if err != nil {
 		return err

@@ -155,7 +155,7 @@ func Test_Upload(t *testing.T) {
 	}()
 
 	t.Run("Put object", func(t *testing.T) {
-		prov.On("PutObject", mock.Anything, "123", []byte("hello")).Return(nil).Once()
+		prov.On("PutObject", mock.Anything, "123", []byte("hello"), int64(5)).Return(nil).Once()
 
 		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/mock/123", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
@@ -168,7 +168,7 @@ func Test_Upload(t *testing.T) {
 	})
 
 	t.Run("Multi-slash key", func(t *testing.T) {
-		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello")).Return(nil).Once()
+		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), int64(5)).Return(nil).Once()
 
 		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/mock/123/456/abc", port), strings.NewReader("hello"))
 		assert.NoError(t, err)

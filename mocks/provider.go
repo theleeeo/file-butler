@@ -59,12 +59,12 @@ func (p *Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, er
 	return r1.(io.ReadCloser), called.Error(1)
 }
 
-func (p *Provider) PutObject(ctx context.Context, key string, data io.Reader) error {
+func (p *Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64) error {
 	completeData, err := io.ReadAll(data)
 	if err != nil {
 		panic(err)
 	}
 
-	called := p.Called(ctx, key, completeData)
+	called := p.Called(ctx, key, completeData, length)
 	return called.Error(0)
 }

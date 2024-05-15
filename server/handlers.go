@@ -16,6 +16,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	allowUnknownContentLength = true
+)
+
 func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 	var reqType authorization.RequestType
 	switch r.Method {
@@ -74,7 +78,27 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 	}
 	defer dataSrc.Close()
 
-	if err := prov.PutObject(r.Context(), key, dataSrc); err != nil {
+	contentLength := r.ContentLength
+	if contentLength == 0 {
+		return lerr.New("no content to upload", http.StatusBadRequest)
+	}
+
+	// The content length is unknown
+	if contentLength < 0 {
+		if !allowUnknownContentLength {
+			return lerr.New("content length must be set", http.StatusBadRequest)
+		}
+
+		body, err := io.ReadAll(dataSrc)
+		if err != nil {
+			fmt.Println("error:", err)
+			return err
+		}
+		contentLength = int64(len(body))
+		dataSrc = io.NopCloser(strings.NewReader(string(body)))
+	}
+
+	if err := prov.PutObject(r.Context(), key, dataSrc, contentLength); err != nil {
 		if errors.Is(err, provider.ErrDenied) {
 			return lerr.Wrap("error uploading object", err, http.StatusForbidden)
 		}

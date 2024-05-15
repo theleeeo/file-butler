@@ -34,6 +34,6 @@ func (n *VoidProvider) GetObject(ctx context.Context, key string) (io.ReadCloser
 	return io.NopCloser(strings.NewReader("null\n")), nil
 }
 
-func (n *VoidProvider) PutObject(ctx context.Context, key string, data io.Reader) error {
+func (n *VoidProvider) PutObject(ctx context.Context, key string, data io.Reader, length int64) error {
 	return nil
 }

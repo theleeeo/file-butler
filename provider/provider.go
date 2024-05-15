@@ -44,7 +44,7 @@ type Provider interface {
 	AuthPlugin() string
 
 	GetObject(ctx context.Context, key string) (io.ReadCloser, error)
-	PutObject(ctx context.Context, key string, data io.Reader) error
+	PutObject(ctx context.Context, key string, data io.Reader, length int64) error
 }
 
 type PresignOperation string
