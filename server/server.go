@@ -66,8 +66,8 @@ func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/{provider}/", s.handleFile)
-
+	// Use a prefix for the file-route as well to avoid having to deal with restricting providernames like "presign" and "meta"
+	mux.HandleFunc("/file/{provider}/", s.handleFile)
 	mux.HandleFunc("/presign/{provider}/", s.handlePresign)
 
 	s.srv = &http.Server{

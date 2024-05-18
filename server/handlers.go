@@ -38,7 +38,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := strings.TrimPrefix(r.URL.Path, "/"+providerName+"/")
+	key := strings.TrimPrefix(r.URL.Path, "/file/"+providerName+"/")
 	if key == "" {
 		http.Error(w, "key is required", http.StatusBadRequest)
 		return
