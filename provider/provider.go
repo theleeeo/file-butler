@@ -10,6 +10,9 @@ var (
 	ErrNotFound  = errors.New("resource not found")
 	ErrDenied    = errors.New("access denied")
 	ErrNoPresign = errors.New("presigning is not allowed for this provider")
+	// This is a special error that the provider can return to indicate that the object has not been modified since the specified time
+	// It will be translated into a 304 Not Modified response by the server
+	ErrNotModified = errors.New("resource not modified")
 )
 
 type ProviderType string
@@ -44,7 +47,8 @@ type Provider interface {
 	AuthPlugin() string
 
 	GetObject(ctx context.Context, key string) (io.ReadCloser, error)
-	PutObject(ctx context.Context, key string, data io.Reader, length int64) error
+	PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error
+	GetTags(ctx context.Context, key string) (map[string]string, error)
 }
 
 type PresignOperation string

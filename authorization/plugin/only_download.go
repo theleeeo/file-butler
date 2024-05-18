@@ -16,5 +16,9 @@ func (p *OnlyDownloadPlugin) Authorize(ctx context.Context, req *authorization.A
 		return nil
 	}
 
+	if req.RequestType == authorization.RequestType_REQUEST_TYPE_GET_TAGS {
+		return nil
+	}
+
 	return status.Error(codes.PermissionDenied, "only download requests are allowed")
 }

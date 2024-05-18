@@ -34,6 +34,10 @@ func (n *VoidProvider) GetObject(ctx context.Context, key string) (io.ReadCloser
 	return io.NopCloser(strings.NewReader("null\n")), nil
 }
 
-func (n *VoidProvider) PutObject(ctx context.Context, key string, data io.Reader, length int64) error {
+func (n *VoidProvider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {
 	return nil
+}
+
+func (n *VoidProvider) GetTags(ctx context.Context, key string) (map[string]string, error) {
+	return nil, nil
 }

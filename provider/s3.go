@@ -89,18 +89,35 @@ func (s *S3Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, 
 	return output.Body, nil
 }
 
-func (s *S3Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64) error {
+func (s *S3Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        &s.bucketName,
 		Key:           &key,
 		Body:          data,
 		ContentLength: &length,
+		Tagging:       buildTagging(tags),
 	})
 	if err != nil {
 		return err
 	}
 
+	fmt.Println(*buildTagging(tags))
+
 	return nil
+}
+
+func buildTagging(tags map[string]string) *string {
+	if len(tags) == 0 {
+		return nil
+	}
+
+	var tagSet []string
+	for k, v := range tags {
+		tagSet = append(tagSet, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	tagging := strings.Join(tagSet, "&")
+	return &tagging
 }
 
 func (s *S3Provider) PresignURL(ctx context.Context, key string, op PresignOperation) (string, error) {
@@ -130,6 +147,31 @@ func (s *S3Provider) PresignURL(ctx context.Context, key string, op PresignOpera
 	}
 
 	return req.URL, nil
+}
+
+func (s *S3Provider) GetTags(ctx context.Context, key string) (map[string]string, error) {
+	output, err := s.client.GetObjectTagging(ctx, &s3.GetObjectTaggingInput{
+		Bucket: &s.bucketName,
+		Key:    &key,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "NoSuchKey") {
+			return nil, ErrNotFound
+		}
+
+		if strings.Contains(err.Error(), "AccessDenied") {
+			return nil, ErrDenied
+		}
+
+		return nil, err
+	}
+
+	tags := make(map[string]string, len(output.TagSet))
+	for _, tag := range output.TagSet {
+		tags[*tag.Key] = *tag.Value
+	}
+
+	return tags, nil
 }
 
 // func (s *S3Provider) ListObjects() ([]ObjectInfo, error) {

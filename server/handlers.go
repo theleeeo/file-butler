@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -98,7 +99,12 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 		dataSrc = io.NopCloser(strings.NewReader(string(body)))
 	}
 
-	if err := prov.PutObject(r.Context(), key, dataSrc, contentLength); err != nil {
+	q, err := convertQuery(r.URL.Query())
+	if err != nil {
+		return err
+	}
+
+	if err := prov.PutObject(r.Context(), key, dataSrc, contentLength, q); err != nil {
 		if errors.Is(err, provider.ErrDenied) {
 			return lerr.Wrap("error uploading object", err, http.StatusForbidden)
 		}
@@ -107,6 +113,19 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 	}
 
 	return nil
+}
+
+func convertQuery(query map[string][]string) (map[string]string, error) {
+	converted := make(map[string]string)
+	for k, v := range query {
+		if len(v) > 1 {
+			return nil, lerr.New(fmt.Sprintf("multiple values for key %s, this is not supported", k), http.StatusBadRequest)
+		}
+
+		converted[k] = v[0]
+	}
+
+	return converted, nil
 }
 
 func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
@@ -269,4 +288,43 @@ func (s *Server) handlePresign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _ = w.Write([]byte(url))
+}
+
+func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
+	providerName := r.PathValue("provider")
+	p := s.getProvider(providerName)
+	if p == nil {
+		http.Error(w, "provider not found", http.StatusNotFound)
+		return
+	}
+
+	key := strings.TrimPrefix(r.URL.Path, "/tags/"+providerName+"/")
+	if key == "" {
+		http.Error(w, "key is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.authorizeRequest(r.Context(), authorization.RequestType_REQUEST_TYPE_GET_TAGS, r.Header, key, p); err != nil {
+		http.Error(w, err.Error(), lerr.Code(err))
+		return
+	}
+
+	tags, err := p.GetTags(r.Context(), key)
+	if err != nil {
+		if errors.Is(err, provider.ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(tags); err != nil {
+		log.Println("error encoding tags:", err)
+		// If some part of the response was able to be written, the client will already have received a partial response and status code 200.
+		// This is for if the response was not able to be written at all.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

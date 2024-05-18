@@ -95,7 +95,7 @@ func Test_Download(t *testing.T) {
 		prov.On("GetObject", mock.Anything, "123").Return(
 			"hello", nil).Once()
 
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/mock/123", port), nil)
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/file/mock/123", port), nil)
 		assert.NoError(t, err)
 
 		client := http.Client{}
@@ -112,7 +112,7 @@ func Test_Download(t *testing.T) {
 		prov.On("GetObject", mock.Anything, "123/456/abc").Return(
 			"hello", nil).Once()
 
-		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/mock/123/456/abc", port), nil)
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc", port), nil)
 		assert.NoError(t, err)
 
 		client := http.Client{}
@@ -155,9 +155,9 @@ func Test_Upload(t *testing.T) {
 	}()
 
 	t.Run("Put object", func(t *testing.T) {
-		prov.On("PutObject", mock.Anything, "123", []byte("hello"), int64(5)).Return(nil).Once()
+		prov.On("PutObject", mock.Anything, "123", []byte("hello"), int64(5), map[string]string{}).Return(nil).Once()
 
-		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/mock/123", port), strings.NewReader("hello"))
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
 
 		client := http.Client{}
@@ -168,9 +168,9 @@ func Test_Upload(t *testing.T) {
 	})
 
 	t.Run("Multi-slash key", func(t *testing.T) {
-		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), int64(5)).Return(nil).Once()
+		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), int64(5), map[string]string{}).Return(nil).Once()
 
-		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/mock/123/456/abc", port), strings.NewReader("hello"))
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
 
 		client := http.Client{}
@@ -178,6 +178,37 @@ func Test_Upload(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("With tags", func(t *testing.T) {
+		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), int64(5), map[string]string{
+			"abc":  "123",
+			"pepe": "frog",
+		}).Return(nil).Once()
+
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc?abc=123&pepe=frog", port), strings.NewReader("hello"))
+		assert.NoError(t, err)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("Double of same tag not allowed", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc?abc=123&abc=123", port), strings.NewReader("hello"))
+		assert.NoError(t, err)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "multiple values for key abc, this is not supported\n", string(d))
 	})
 }
 
@@ -210,7 +241,7 @@ func Test_Upload_DontAllowRawBody(t *testing.T) {
 	}()
 
 	t.Run("Put object", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/mock/123", port), strings.NewReader("hello"))
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
 
 		client := http.Client{}
@@ -301,5 +332,67 @@ func Test_Presign(t *testing.T) {
 		d, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
 		assert.Equal(t, "presignHello", string(d))
+	})
+}
+
+func Test_GetTags(t *testing.T) {
+	plg, err := authPlugin.NewPlugin(authPlugin.Config{
+		Name:    "default",
+		BuiltIn: "allow-all",
+	})
+	assert.NoError(t, err)
+
+	port, err := getValidPort()
+	assert.NoError(t, err)
+
+	srv, err := NewServer(Config{
+		Addr:              fmt.Sprint("localhost:", port),
+		DefaultAuthPlugin: "default",
+	}, []authPlugin.Plugin{plg})
+	assert.NoError(t, err)
+
+	prov := mocks.NewProvider(provider.ConfigBase{ID: "mock"})
+	err = srv.RegisterProvider(prov)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		assert.Nil(t, srv.Run(ctx))
+	}()
+
+	t.Run("Get tags", func(t *testing.T) {
+		prov.On("GetTags", mock.Anything, "123").Return(
+			map[string]string{"hello": "world"}, nil).Once()
+
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/tags/mock/123", port), nil)
+		assert.NoError(t, err)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"hello":"world"}`, string(d))
+	})
+
+	t.Run("Multi-slash key", func(t *testing.T) {
+		prov.On("GetTags", mock.Anything, "123/456/abc").Return(
+			map[string]string{"hello": "world"}, nil).Once()
+
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/tags/mock/123/456/abc", port), nil)
+		assert.NoError(t, err)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"hello":"world"}`, string(d))
 	})
 }

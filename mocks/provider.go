@@ -59,12 +59,21 @@ func (p *Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, er
 	return r1.(io.ReadCloser), called.Error(1)
 }
 
-func (p *Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64) error {
+func (p *Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {
 	completeData, err := io.ReadAll(data)
 	if err != nil {
 		panic(err)
 	}
 
-	called := p.Called(ctx, key, completeData, length)
+	called := p.Called(ctx, key, completeData, length, tags)
 	return called.Error(0)
+}
+
+func (p *Provider) GetTags(ctx context.Context, key string) (map[string]string, error) {
+	called := p.Called(ctx, key)
+	if called.Get(0) == nil {
+		return nil, called.Error(1)
+	}
+
+	return called.Get(0).(map[string]string), called.Error(1)
 }
