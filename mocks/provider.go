@@ -32,31 +32,32 @@ func (p *Provider) Id() string {
 	return p.cfg.ID
 }
 
-func (p *Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
-	called := p.Called(ctx, key)
+func (p *Provider) GetObject(ctx context.Context, key string, opts provider.GetOptions) (io.ReadCloser, provider.ObjectInfo, error) {
+	called := p.Called(ctx, key, opts)
 
 	r1 := called.Get(0)
 	if r1 == nil {
-		return nil, called.Error(1)
+		return nil, provider.ObjectInfo{}, called.Error(2)
 	}
 
+	var rc io.ReadCloser
 	if r1, ok := r1.(io.ReadCloser); ok {
-		return r1, called.Error(1)
+		rc = r1
 	}
 
 	if r1, ok := r1.(io.Reader); ok {
-		return io.NopCloser(r1), called.Error(1)
+		rc = io.NopCloser(r1)
 	}
 
 	if r1, ok := r1.(string); ok {
-		return io.NopCloser(strings.NewReader(r1)), called.Error(1)
+		rc = io.NopCloser(strings.NewReader(r1))
 	}
 
 	if r1, ok := r1.([]byte); ok {
-		return io.NopCloser(bytes.NewBuffer(r1)), called.Error(1)
+		rc = io.NopCloser(bytes.NewBuffer(r1))
 	}
 
-	return r1.(io.ReadCloser), called.Error(1)
+	return rc, called.Get(1).(provider.ObjectInfo), nil
 }
 
 func (p *Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 )
 
 var (
@@ -46,9 +47,19 @@ type Provider interface {
 	// If the provider does not specify an auth plugin the default one will be used
 	AuthPlugin() string
 
-	GetObject(ctx context.Context, key string) (io.ReadCloser, error)
+	GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error)
 	PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error
 	GetTags(ctx context.Context, key string) (map[string]string, error)
+}
+
+type GetOptions struct {
+	// If specified, the provider should only return the object if it has not been modified since this time, otherwise return ErrNotModified
+	// If zero, the provider should return the object regardless of its modification time
+	LastModified *time.Time
+}
+
+type ObjectInfo struct {
+	LastModified *time.Time
 }
 
 type PresignOperation string

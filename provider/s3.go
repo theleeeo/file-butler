@@ -69,24 +69,50 @@ func (s *S3Provider) AuthPlugin() string {
 	return s.authPlugin
 }
 
-func (s *S3Provider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
+func (s *S3Provider) GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error) {
+	// Only return the object if it has been modified since the specified time
+	// Otherwise return the ErrNotModified error
+	if opts.LastModified != nil {
+		output, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
+			Bucket: &s.bucketName,
+			Key:    &key,
+		})
+		if err != nil {
+			if strings.Contains(err.Error(), "NoSuchKey") {
+				return nil, ObjectInfo{}, ErrNotFound
+			}
+
+			if strings.Contains(err.Error(), "AccessDenied") {
+				return nil, ObjectInfo{}, ErrDenied
+			}
+
+			return nil, ObjectInfo{}, err
+		}
+
+		// If the object has not been modified since the specified time, return ErrNotModified which will be translated into a 304 Not Modified response by the server
+		// It checks for Not After instead of Before because otherwise it will return false when the timestamps are equal
+		if output.LastModified != nil && !output.LastModified.After(*opts.LastModified) {
+			return nil, ObjectInfo{}, ErrNotModified
+		}
+	}
+
 	output, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &s.bucketName,
 		Key:    &key,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "NoSuchKey") {
-			return nil, ErrNotFound
+			return nil, ObjectInfo{}, ErrNotFound
 		}
 
 		if strings.Contains(err.Error(), "AccessDenied") {
-			return nil, ErrDenied
+			return nil, ObjectInfo{}, ErrDenied
 		}
 
-		return nil, err
+		return nil, ObjectInfo{}, err
 	}
 
-	return output.Body, nil
+	return output.Body, ObjectInfo{LastModified: output.LastModified}, nil
 }
 
 func (s *S3Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {
@@ -100,8 +126,6 @@ func (s *S3Provider) PutObject(ctx context.Context, key string, data io.Reader, 
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(*buildTagging(tags))
 
 	return nil
 }

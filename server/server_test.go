@@ -31,6 +31,10 @@ func getValidPort() (int, error) {
 	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
+func ptrTo[T any](v T) *T {
+	return &v
+}
+
 func Test_CreateServer(t *testing.T) {
 	plg, err := authPlugin.NewPlugin(authPlugin.Config{
 		Name:    "default",
@@ -92,8 +96,8 @@ func Test_Download(t *testing.T) {
 	}()
 
 	t.Run("Get object", func(t *testing.T) {
-		prov.On("GetObject", mock.Anything, "123").Return(
-			"hello", nil).Once()
+		prov.On("GetObject", mock.Anything, "123", provider.GetOptions{}).Return(
+			"hello", provider.ObjectInfo{}, nil).Once()
 
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/file/mock/123", port), nil)
 		assert.NoError(t, err)
@@ -109,8 +113,8 @@ func Test_Download(t *testing.T) {
 	})
 
 	t.Run("Multi-slash key", func(t *testing.T) {
-		prov.On("GetObject", mock.Anything, "123/456/abc").Return(
-			"hello", nil).Once()
+		prov.On("GetObject", mock.Anything, "123/456/abc", provider.GetOptions{}).Return(
+			"hello", provider.ObjectInfo{}, nil).Once()
 
 		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc", port), nil)
 		assert.NoError(t, err)
@@ -394,5 +398,89 @@ func Test_GetTags(t *testing.T) {
 		d, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
 		assert.JSONEq(t, `{"hello":"world"}`, string(d))
+	})
+}
+
+func Test_Download_WithLastModified(t *testing.T) {
+	plg, err := authPlugin.NewPlugin(authPlugin.Config{
+		Name:    "default",
+		BuiltIn: "allow-all",
+	})
+	assert.NoError(t, err)
+
+	port, err := getValidPort()
+	assert.NoError(t, err)
+
+	srv, err := NewServer(Config{
+		Addr:              fmt.Sprint("localhost:", port),
+		DefaultAuthPlugin: "default",
+	}, []authPlugin.Plugin{plg})
+	assert.NoError(t, err)
+
+	prov := mocks.NewProvider(provider.ConfigBase{ID: "mock"})
+	err = srv.RegisterProvider(prov)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		assert.Nil(t, srv.Run(ctx))
+	}()
+
+	t.Run("Object not modified", func(t *testing.T) {
+		prov.On("GetObject", mock.Anything, "123", provider.GetOptions{LastModified: ptrTo(time.Unix(100, 0).UTC())}).Return(
+			nil, provider.ObjectInfo{}, provider.ErrNotModified).Once()
+
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/file/mock/123", port), nil)
+		assert.NoError(t, err)
+		req.Header.Set("If-Modified-Since", time.Unix(100, 0).UTC().Format(http.TimeFormat))
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusNotModified, resp.StatusCode)
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "", string(d))
+	})
+
+	t.Run("Multi-slash key", func(t *testing.T) {
+		prov.On("GetObject", mock.Anything, "123/456/abc", provider.GetOptions{LastModified: ptrTo(time.Unix(100, 0).UTC())}).Return(
+			nil, provider.ObjectInfo{}, provider.ErrNotModified).Once()
+
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc", port), nil)
+		assert.NoError(t, err)
+		req.Header.Set("If-Modified-Since", time.Unix(100, 0).UTC().Format(http.TimeFormat))
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusNotModified, resp.StatusCode)
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "", string(d))
+	})
+
+	t.Run("Object is modified", func(t *testing.T) {
+		prov.On("GetObject", mock.Anything, "123", provider.GetOptions{LastModified: ptrTo(time.Unix(100, 0).UTC())}).Return(
+			"hello", provider.ObjectInfo{LastModified: ptrTo(time.Unix(100, 0).UTC())}, nil).Once()
+
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/file/mock/123", port), nil)
+		assert.NoError(t, err)
+		req.Header.Set("If-Modified-Since", time.Unix(100, 0).UTC().Format(http.TimeFormat))
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "hello", string(d))
+
+		assert.Equal(t, time.Unix(100, 0).UTC().Format(http.TimeFormat), resp.Header.Get("Last-Modified"))
 	})
 }

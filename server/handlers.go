@@ -51,13 +51,22 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if reqType == authorization.RequestType_REQUEST_TYPE_DOWNLOAD {
-		data, err := s.handleDownload(r, p, key)
+		data, objectInfo, err := s.handleDownload(r, p, key)
 		if err != nil {
+			if errors.Is(err, provider.ErrNotModified) {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+
 			http.Error(w, err.Error(), lerr.Code(err))
 			return
 		}
-
 		defer data.Close()
+
+		if objectInfo.LastModified != nil {
+			w.Header().Set("Last-Modified", objectInfo.LastModified.Format(http.TimeFormat))
+		}
+
 		if _, err := io.Copy(w, data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -69,6 +78,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 	if err := s.handleUpload(r, p, key); err != nil {
 		http.Error(w, err.Error(), lerr.Code(err))
 	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -159,20 +169,34 @@ func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
 	return data, nil
 }
 
-func (s *Server) handleDownload(r *http.Request, prov provider.Provider, key string) (io.ReadCloser, error) {
-	data, err := prov.GetObject(r.Context(), key)
-	if err != nil {
-		if errors.Is(err, provider.ErrNotFound) {
-			return nil, lerr.New(err.Error(), http.StatusNotFound)
-		}
-		if errors.Is(err, provider.ErrDenied) {
-			return nil, lerr.New(err.Error(), http.StatusForbidden)
+func (s *Server) handleDownload(r *http.Request, prov provider.Provider, key string) (io.ReadCloser, provider.ObjectInfo, error) {
+	opts := provider.GetOptions{}
+
+	if r.Header.Get("If-Modified-Since") != "" {
+		t, err := http.ParseTime(r.Header.Get("If-Modified-Since"))
+		if err != nil {
+			return nil, provider.ObjectInfo{}, lerr.New("invalid If-Modified-Since header", http.StatusBadRequest)
 		}
 
-		return nil, lerr.New(err.Error(), http.StatusInternalServerError)
+		opts.LastModified = &t
 	}
 
-	return data, nil
+	data, objectInfo, err := prov.GetObject(r.Context(), key, opts)
+	if err != nil {
+		if errors.Is(err, provider.ErrNotFound) {
+			return nil, provider.ObjectInfo{}, lerr.New(err.Error(), http.StatusNotFound)
+		}
+		if errors.Is(err, provider.ErrDenied) {
+			return nil, provider.ObjectInfo{}, lerr.New(err.Error(), http.StatusForbidden)
+		}
+		if errors.Is(err, provider.ErrNotModified) {
+			return nil, provider.ObjectInfo{}, err
+		}
+
+		return nil, provider.ObjectInfo{}, lerr.New(err.Error(), http.StatusInternalServerError)
+	}
+
+	return data, objectInfo, nil
 }
 
 func (s *Server) authorizeRequest(ctx context.Context, reqType authorization.RequestType, headers map[string][]string, key string, p provider.Provider) error {

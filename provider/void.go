@@ -30,8 +30,8 @@ func (n *VoidProvider) AuthPlugin() string {
 	return n.authPlugin
 }
 
-func (n *VoidProvider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
-	return io.NopCloser(strings.NewReader("null\n")), nil
+func (n *VoidProvider) GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error) {
+	return io.NopCloser(strings.NewReader("null\n")), ObjectInfo{}, nil
 }
 
 func (n *VoidProvider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {

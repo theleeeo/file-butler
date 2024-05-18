@@ -32,9 +32,9 @@ func (n *LogProvider) AuthPlugin() string {
 	return n.authPlugin
 }
 
-func (n *LogProvider) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
-	log.Printf("GetObject %s", key)
-	return io.NopCloser(strings.NewReader("Hello World!\n")), nil
+func (n *LogProvider) GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error) {
+	log.Printf("GetObject %s, opts=%v\n", key, opts)
+	return io.NopCloser(strings.NewReader("Hello World!\n")), ObjectInfo{}, nil
 }
 
 func (n *LogProvider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {
