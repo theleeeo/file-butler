@@ -46,7 +46,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.authorizeRequest(r.Context(), reqType, r.Header, key, p); err != nil {
-		http.Error(w, err.Error(), lerr.Code(err))
+		lerr.ToHTTP(w, err)
 		return
 	}
 
@@ -58,7 +58,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			http.Error(w, err.Error(), lerr.Code(err))
+			lerr.ToHTTP(w, err)
 			return
 		}
 		defer data.Close()
@@ -80,7 +80,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.handleUpload(r, p, key); err != nil {
-		http.Error(w, err.Error(), lerr.Code(err))
+		lerr.ToHTTP(w, err)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -95,13 +95,13 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 
 	contentLength := r.ContentLength
 	if contentLength == 0 {
-		return lerr.New("no content to upload", http.StatusBadRequest)
+		return lerr.New(http.StatusBadRequest, "no content to upload")
 	}
 
 	// The content length is unknown
 	if contentLength < 0 {
 		if !allowUnknownContentLength {
-			return lerr.New("content length must be set", http.StatusBadRequest)
+			return lerr.New(http.StatusBadRequest, "content length must be set")
 		}
 
 		body, err := io.ReadAll(dataSrc)
@@ -120,10 +120,10 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 
 	if err := prov.PutObject(r.Context(), key, dataSrc, contentLength, tags); err != nil {
 		if errors.Is(err, provider.ErrDenied) {
-			return lerr.Wrap("error uploading object", err, http.StatusForbidden)
+			return lerr.Wrap(err, http.StatusForbidden, "error uploading object")
 		}
 
-		return lerr.New(err.Error(), http.StatusInternalServerError)
+		return lerr.New(http.StatusInternalServerError, err.Error())
 	}
 
 	return nil
@@ -138,15 +138,15 @@ func parseTags(rawTags []string) (map[string]string, error) {
 	for _, tag := range rawTags {
 		parts := strings.Split(tag, ":")
 		if len(parts) != 2 {
-			return nil, lerr.New("invalid tag format", http.StatusBadRequest)
+			return nil, lerr.New(http.StatusBadRequest, "invalid tag format")
 		}
 
 		if parts[0] == "" || parts[1] == "" {
-			return nil, lerr.New("invalid tag format", http.StatusBadRequest)
+			return nil, lerr.New(http.StatusBadRequest, "invalid tag format")
 		}
 
 		if _, ok := parsedTags[parts[0]]; ok {
-			return nil, lerr.New(fmt.Sprintf("multiple values for key %s, this is not supported", parts[0]), http.StatusBadRequest)
+			return nil, lerr.Newf(http.StatusBadRequest, "multiple values for key %s, this is not supported", parts[0])
 		}
 
 		parsedTags[parts[0]] = parts[1]
@@ -163,21 +163,21 @@ func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			log.Println("error parsing multipart form:", err)
 
-			return nil, lerr.Wrap("error parsing multipart form:", err, http.StatusBadRequest)
+			return nil, lerr.Wrap(err, http.StatusBadRequest, "error parsing multipart form:")
 		}
 
 		file, _, err := r.FormFile("file")
 		if err != nil {
 			log.Println("error getting file from form:", err)
 
-			return nil, lerr.Wrap("error getting file from form:", err, http.StatusBadRequest)
+			return nil, lerr.Wrap(err, http.StatusBadRequest, "error getting file from form:")
 		}
 		data = file
 	} else {
 		if !allowRawBody {
 			log.Println("attempted to upload raw body data when it is not allowed")
 
-			return nil, lerr.New("raw body uploads are not allowed, use multipart form data", http.StatusUnsupportedMediaType)
+			return nil, lerr.New(http.StatusUnsupportedMediaType, "raw body uploads are not allowed, use multipart form data")
 		}
 
 		data = r.Body
@@ -192,7 +192,7 @@ func (s *Server) handleDownload(r *http.Request, prov provider.Provider, key str
 	if r.Header.Get("If-Modified-Since") != "" {
 		t, err := http.ParseTime(r.Header.Get("If-Modified-Since"))
 		if err != nil {
-			return nil, provider.ObjectInfo{}, lerr.New("invalid If-Modified-Since header", http.StatusBadRequest)
+			return nil, provider.ObjectInfo{}, lerr.New(http.StatusBadRequest, "invalid If-Modified-Since header")
 		}
 
 		opts.LastModified = &t
@@ -201,16 +201,16 @@ func (s *Server) handleDownload(r *http.Request, prov provider.Provider, key str
 	data, objectInfo, err := prov.GetObject(r.Context(), key, opts)
 	if err != nil {
 		if errors.Is(err, provider.ErrNotFound) {
-			return nil, provider.ObjectInfo{}, lerr.New(err.Error(), http.StatusNotFound)
+			return nil, provider.ObjectInfo{}, lerr.Newf(http.StatusNotFound, err.Error())
 		}
 		if errors.Is(err, provider.ErrDenied) {
-			return nil, provider.ObjectInfo{}, lerr.New(err.Error(), http.StatusForbidden)
+			return nil, provider.ObjectInfo{}, lerr.New(http.StatusForbidden, err.Error())
 		}
 		if errors.Is(err, provider.ErrNotModified) {
 			return nil, provider.ObjectInfo{}, err
 		}
 
-		return nil, provider.ObjectInfo{}, lerr.New(err.Error(), http.StatusInternalServerError)
+		return nil, provider.ObjectInfo{}, lerr.Newf(http.StatusInternalServerError, "error getting object from provider: %s", err.Error())
 	}
 
 	return data, objectInfo, nil
@@ -224,7 +224,7 @@ func (s *Server) authorizeRequest(ctx context.Context, reqType authorization.Req
 
 	authPlugin := s.setPlugin(authPluginName)
 	if authPlugin == nil {
-		return lerr.New("no auth plugin found for provider "+p.Id(), http.StatusInternalServerError)
+		return lerr.Newf(http.StatusInternalServerError, "no auth plugin found for provider %s", p.Id())
 	}
 
 	var authHeaderMap []*authorization.Header
@@ -245,18 +245,18 @@ func (s *Server) authorizeRequest(ctx context.Context, reqType authorization.Req
 	if err := authPlugin.Authorize(ctx, req); err != nil {
 		s, ok := status.FromError(err)
 		if !ok {
-			return lerr.New(fmt.Sprintf("plugin error not a grpc status! error=%s", err.Error()), http.StatusInternalServerError)
+			return lerr.Newf(http.StatusInternalServerError, "plugin error not a grpc status! error=%s", err.Error())
 		}
 
 		if s.Code() == codes.Unauthenticated {
-			return lerr.New(fmt.Sprintf("Unauthenticated: %s", s.Message()), http.StatusUnauthorized)
+			return lerr.Newf(http.StatusUnauthorized, "Unauthenticated: %s", s.Message())
 		}
 
 		if s.Code() == codes.PermissionDenied {
-			return lerr.New(fmt.Sprintf("permission denied: %s", s.Message()), http.StatusForbidden)
+			return lerr.Newf(http.StatusForbidden, "permission denied: %s", s.Message())
 		}
 
-		return lerr.New(fmt.Sprintf("plugin error: %s", s.Message()), http.StatusInternalServerError)
+		return lerr.Newf(http.StatusInternalServerError, "plugin error: %s", s.Message())
 	}
 
 	return nil
@@ -308,7 +308,7 @@ func (s *Server) handlePresign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.authorizeRequest(r.Context(), reqType, r.Header, key, p); err != nil {
-		http.Error(w, err.Error(), lerr.Code(err))
+		lerr.ToHTTP(w, err)
 		return
 	}
 
@@ -346,7 +346,7 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.authorizeRequest(r.Context(), authorization.RequestType_REQUEST_TYPE_GET_TAGS, r.Header, key, p); err != nil {
-		http.Error(w, err.Error(), lerr.Code(err))
+		lerr.ToHTTP(w, err)
 		return
 	}
 
