@@ -190,7 +190,7 @@ func Test_Upload(t *testing.T) {
 			"pepe": "frog",
 		}).Return(nil).Once()
 
-		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc?abc=123&pepe=frog", port), strings.NewReader("hello"))
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc?tag=abc:123&tag=pepe:frog", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
 
 		client := http.Client{}
@@ -201,7 +201,7 @@ func Test_Upload(t *testing.T) {
 	})
 
 	t.Run("Double of same tag not allowed", func(t *testing.T) {
-		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc?abc=123&abc=123", port), strings.NewReader("hello"))
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc?tag=abc:123&tag=abc:123", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
 
 		client := http.Client{}

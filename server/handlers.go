@@ -109,12 +109,12 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 		dataSrc = io.NopCloser(strings.NewReader(string(body)))
 	}
 
-	q, err := convertQuery(r.URL.Query())
+	tags, err := parseTags(r.URL.Query()["tag"])
 	if err != nil {
 		return err
 	}
 
-	if err := prov.PutObject(r.Context(), key, dataSrc, contentLength, q); err != nil {
+	if err := prov.PutObject(r.Context(), key, dataSrc, contentLength, tags); err != nil {
 		if errors.Is(err, provider.ErrDenied) {
 			return lerr.Wrap("error uploading object", err, http.StatusForbidden)
 		}
@@ -125,17 +125,30 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 	return nil
 }
 
-func convertQuery(query map[string][]string) (map[string]string, error) {
-	converted := make(map[string]string)
-	for k, v := range query {
-		if len(v) > 1 {
-			return nil, lerr.New(fmt.Sprintf("multiple values for key %s, this is not supported", k), http.StatusBadRequest)
-		}
-
-		converted[k] = v[0]
+func parseTags(rawTags []string) (map[string]string, error) {
+	if len(rawTags) == 0 {
+		return nil, nil
 	}
 
-	return converted, nil
+	parsedTags := make(map[string]string)
+	for _, tag := range rawTags {
+		parts := strings.Split(tag, ":")
+		if len(parts) != 2 {
+			return nil, lerr.New("invalid tag format", http.StatusBadRequest)
+		}
+
+		if parts[0] == "" || parts[1] == "" {
+			return nil, lerr.New("invalid tag format", http.StatusBadRequest)
+		}
+
+		if _, ok := parsedTags[parts[0]]; ok {
+			return nil, lerr.New(fmt.Sprintf("multiple values for key %s, this is not supported", parts[0]), http.StatusBadRequest)
+		}
+
+		parsedTags[parts[0]] = parts[1]
+	}
+
+	return parsedTags, nil
 }
 
 func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
