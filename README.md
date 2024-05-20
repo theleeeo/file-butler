@@ -48,7 +48,7 @@ Please note that the functionality described in this section is experimental and
 Tags is key:value pairs that can be attached to files. Tags carry no meaning to the file-butler service, but can be used to store metadata about the file in the provider.
 
 Tags must be set as query parameters in the request URL when uploading a file. The format is `?tag=key:value&tag=key:value&...`.
-Example: `PUT /file/s3provider/myfile.txt?tag=author:john&tag=type:document`
+Example: `PUT /tags/s3provider/myfile.txt?tag=author:john&tag=type:document`
 
 This is not supported for all providers and for some providers, not including the tags when updating an existing files will cause the tags to be removed.
 Please refer to the provider documentation for more information.

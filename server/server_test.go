@@ -38,7 +38,8 @@ func ptrTo[T any](v T) *T {
 func Test_CreateServer(t *testing.T) {
 	plg, err := authPlugin.NewPlugin(authPlugin.Config{
 		Name:    "default",
-		BuiltIn: "allow-all",
+		BuiltIn: "allow-types",
+		Args:    []string{"upload"},
 	})
 	assert.NoError(t, err)
 
@@ -68,10 +69,57 @@ func Test_CreateServer(t *testing.T) {
 	})
 }
 
+func Test_Download_NotAllowed(t *testing.T) {
+	plg, err := authPlugin.NewPlugin(authPlugin.Config{
+		Name:    "default",
+		BuiltIn: "allow-types",
+		Args:    []string{"upload"},
+	})
+	assert.NoError(t, err)
+
+	port, err := getValidPort()
+	assert.NoError(t, err)
+
+	srv, err := NewServer(Config{
+		Addr:              fmt.Sprint("localhost:", port),
+		DefaultAuthPlugin: "default",
+	}, []authPlugin.Plugin{plg})
+	assert.NoError(t, err)
+
+	prov := mocks.NewProvider(provider.ConfigBase{ID: "mock"})
+	err = srv.RegisterProvider(prov)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		assert.Nil(t, srv.Run(ctx))
+	}()
+
+	t.Run("Get object", func(t *testing.T) {
+		prov.On("GetObject", mock.Anything, "123", provider.GetOptions{}).Return(
+			"hello", provider.ObjectInfo{}, nil).Once()
+
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://localhost:%d/file/mock/123", port), nil)
+		assert.NoError(t, err)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "permission denied: request type is not allowed\n", string(d))
+	})
+}
+
 func Test_Download(t *testing.T) {
 	plg, err := authPlugin.NewPlugin(authPlugin.Config{
 		Name:    "default",
-		BuiltIn: "allow-all",
+		BuiltIn: "allow-types",
+		Args:    []string{"download"},
 	})
 	assert.NoError(t, err)
 
@@ -130,10 +178,11 @@ func Test_Download(t *testing.T) {
 	})
 }
 
-func Test_Upload(t *testing.T) {
+func Test_Upload_NotAllowed(t *testing.T) {
 	plg, err := authPlugin.NewPlugin(authPlugin.Config{
 		Name:    "default",
-		BuiltIn: "allow-all",
+		BuiltIn: "allow-types",
+		Args:    []string{"download"},
 	})
 	assert.NoError(t, err)
 
@@ -159,7 +208,52 @@ func Test_Upload(t *testing.T) {
 	}()
 
 	t.Run("Put object", func(t *testing.T) {
-		prov.On("PutObject", mock.Anything, "123", []byte("hello"), int64(5), map[string]string{}).Return(nil).Once()
+		prov.On("PutObject", mock.Anything, "123", []byte("hello"), int64(5), map[string]string(nil)).Return(nil).Once()
+
+		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123", port), strings.NewReader("hello"))
+		assert.NoError(t, err)
+
+		client := http.Client{}
+		resp, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		d, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.Equal(t, "permission denied: request type is not allowed\n", string(d))
+	})
+}
+func Test_Upload(t *testing.T) {
+	plg, err := authPlugin.NewPlugin(authPlugin.Config{
+		Name:    "default",
+		BuiltIn: "allow-types",
+		Args:    []string{"upload"},
+	})
+	assert.NoError(t, err)
+
+	port, err := getValidPort()
+	assert.NoError(t, err)
+
+	srv, err := NewServer(Config{
+		Addr:              fmt.Sprint("localhost:", port),
+		DefaultAuthPlugin: "default",
+		AllowRawBody:      true,
+	}, []authPlugin.Plugin{plg})
+	assert.NoError(t, err)
+
+	prov := mocks.NewProvider(provider.ConfigBase{ID: "mock"})
+	err = srv.RegisterProvider(prov)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		assert.Nil(t, srv.Run(ctx))
+	}()
+
+	t.Run("Put object", func(t *testing.T) {
+		prov.On("PutObject", mock.Anything, "123", []byte("hello"), int64(5), map[string]string(nil)).Return(nil).Once()
 
 		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
@@ -172,7 +266,7 @@ func Test_Upload(t *testing.T) {
 	})
 
 	t.Run("Multi-slash key", func(t *testing.T) {
-		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), int64(5), map[string]string{}).Return(nil).Once()
+		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), int64(5), map[string]string(nil)).Return(nil).Once()
 
 		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
@@ -219,7 +313,8 @@ func Test_Upload(t *testing.T) {
 func Test_Upload_DontAllowRawBody(t *testing.T) {
 	plg, err := authPlugin.NewPlugin(authPlugin.Config{
 		Name:    "default",
-		BuiltIn: "allow-all",
+		BuiltIn: "allow-types",
+		Args:    []string{"upload"},
 	})
 	assert.NoError(t, err)
 
@@ -263,7 +358,8 @@ func Test_Upload_DontAllowRawBody(t *testing.T) {
 func Test_Presign(t *testing.T) {
 	plg, err := authPlugin.NewPlugin(authPlugin.Config{
 		Name:    "default",
-		BuiltIn: "allow-all",
+		BuiltIn: "allow-types",
+		Args:    []string{"download", "upload"},
 	})
 	assert.NoError(t, err)
 
@@ -342,7 +438,8 @@ func Test_Presign(t *testing.T) {
 func Test_GetTags(t *testing.T) {
 	plg, err := authPlugin.NewPlugin(authPlugin.Config{
 		Name:    "default",
-		BuiltIn: "allow-all",
+		BuiltIn: "allow-types",
+		Args:    []string{"get_tags"},
 	})
 	assert.NoError(t, err)
 
@@ -404,7 +501,8 @@ func Test_GetTags(t *testing.T) {
 func Test_Download_WithLastModified(t *testing.T) {
 	plg, err := authPlugin.NewPlugin(authPlugin.Config{
 		Name:    "default",
-		BuiltIn: "allow-all",
+		BuiltIn: "allow-types",
+		Args:    []string{"download"},
 	})
 	assert.NoError(t, err)
 

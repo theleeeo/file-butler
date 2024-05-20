@@ -37,6 +37,8 @@ type Config struct {
 	Addr string
 	// BuiltIn is the identifier for a built-in plugin.
 	BuiltIn string
+	// Args are the arguments to pass to the plugin. (only used with Cmd and BuiltIn)
+	Args []string
 
 	// Name is the unique name of the plugin used to identify it.
 	Name string
@@ -73,6 +75,7 @@ func NewPlugin(cfg Config) (Plugin, error) {
 		var args []string
 		if len(cfg.Cmd) > 1 {
 			args = cfg.Cmd[1:]
+			args = append(args, cfg.Args...)
 		}
 
 		client := plugin.NewClient(&plugin.ClientConfig{
@@ -137,14 +140,14 @@ func NewPlugin(cfg Config) (Plugin, error) {
 		}
 
 		switch cfg.BuiltIn {
-		case "only-download":
-			pg = &pluginBase{
-				Authorizer: &OnlyDownloadPlugin{},
-				name:       cfg.Name,
+		case "allow-types":
+			a, err := NewAllowTypesPlugin(cfg.Args)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create allow-types plugin: %w", err)
 			}
-		case "allow-all":
+
 			pg = &pluginBase{
-				Authorizer: NewAllowAllPlugin(),
+				Authorizer: a,
 				name:       cfg.Name,
 			}
 		default:
