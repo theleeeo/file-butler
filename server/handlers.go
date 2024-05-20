@@ -67,6 +67,10 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Last-Modified", objectInfo.LastModified.Format(http.TimeFormat))
 		}
 
+		if objectInfo.ContentLength != nil {
+			w.Header().Set("Content-Length", fmt.Sprint(*objectInfo.ContentLength))
+		}
+
 		if _, err := io.Copy(w, data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

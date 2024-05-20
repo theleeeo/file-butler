@@ -58,8 +58,14 @@ type GetOptions struct {
 	LastModified *time.Time
 }
 
+// ObjectInfo contains metadata about an object
+// The server will only act on the fields that are not nil
 type ObjectInfo struct {
+	// When the object was last modified
 	LastModified *time.Time
+
+	// The length of the object in bytes
+	ContentLength *int64
 }
 
 type PresignOperation string

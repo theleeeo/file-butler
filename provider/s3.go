@@ -73,7 +73,7 @@ func (s *S3Provider) GetObject(ctx context.Context, key string, opts GetOptions)
 	// Only return the object if it has been modified since the specified time
 	// Otherwise return the ErrNotModified error
 	if opts.LastModified != nil {
-		output, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
+		headResp, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
 			Bucket: &s.bucketName,
 			Key:    &key,
 		})
@@ -91,12 +91,12 @@ func (s *S3Provider) GetObject(ctx context.Context, key string, opts GetOptions)
 
 		// If the object has not been modified since the specified time, return ErrNotModified which will be translated into a 304 Not Modified response by the server
 		// It checks for Not After instead of Before because otherwise it will return false when the timestamps are equal
-		if output.LastModified != nil && !output.LastModified.After(*opts.LastModified) {
+		if headResp.LastModified != nil && !headResp.LastModified.After(*opts.LastModified) {
 			return nil, ObjectInfo{}, ErrNotModified
 		}
 	}
 
-	output, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+	getResp, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: &s.bucketName,
 		Key:    &key,
 	})
@@ -112,7 +112,7 @@ func (s *S3Provider) GetObject(ctx context.Context, key string, opts GetOptions)
 		return nil, ObjectInfo{}, err
 	}
 
-	return output.Body, ObjectInfo{LastModified: output.LastModified}, nil
+	return getResp.Body, ObjectInfo{LastModified: getResp.LastModified, ContentLength: getResp.ContentLength}, nil
 }
 
 func (s *S3Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {
