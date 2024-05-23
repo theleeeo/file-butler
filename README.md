@@ -3,7 +3,44 @@ A multi-source file proxy with custom auth
 
 ## Providers
 
+Providers are the sources of files that the file-butler service can interact with.
+Providers are defined in a separate configuration file and can be of different types.
+The default provider configuration file is `providers.<ext>`. All extensions by the [Viper](https://github.com/spf13/viper) library can be used (JSON, TOML, YAML, HCL).
+All examples in this document will use the TOML format.
+
+The provider configuration file is watched by the file-butler service and will be reloaded live when the file is changed.
+Triggering a file event (eg: saving the file in an editor or using the `touch` command) on the file will cause the service to reload all the providers, removing any that are no longer present and adding any new ones.
+
+What type a configured provider will be is determined by the `type` field in the provider configuration.
+
+The identifier of a provider is the key in the TOML file. This is used to reference the provider in requests to the file-butler service.
+
+On all providers you can specify an `auth-plugin`. If present it will override the global defualt auth-plugin for that provider.
+
 ### AWS-S3
+
+The AWS-S3 provider allows the user to interact with an S3 bucket. Its provider type is `s3`.
+
+Provider config example:
+
+```toml
+[s3test]
+type = "s3"
+region = "eu-north-1"
+bucket = "my-cool-bucket"
+profile = "default"
+presign-enabled = true
+```
+
+If presign is enabled, the provider will support the `presign` request type.
+Default is `false`.
+
+If a profile is specified, the provider will use the credentials from the specified profile in the AWS credentials file.
+If no profile is specified, the provider will use the default credentials.
+
+### Log
+
+### Void
 
 ## Auth-plugins
 
@@ -12,6 +49,29 @@ A multi-source file proxy with custom auth
 ### Command
 
 ### Built-in
+
+The built-in auth plugins are baked into the file-butler service and are always available.
+They does not require any plugins to be created by the user and have a substantially lower overhead than the other auth plugins.
+
+#### allow-types:
+
+The `allow-types` plugin allows the user to specify which request types are allowed. It does not do any other checks.
+
+The available types are:
+- `download` (GET /file)
+- `upload` (PUT /file)
+<!-- - `presign` (GET /presign) -->
+- `get_tags` (GET /tags)
+<!-- - `set_tags` (PUT /tags) -->
+
+Config example:
+
+```toml
+[[auth-plugins]]
+name = "allow-only-files"
+builtin = "allow-types"
+args = ["download", "upload"]
+```
 
 ## Endpoints
 
@@ -34,9 +94,15 @@ Deleting files is currently not supported.
 ### Presigned URLs
 
 Presigned URLs can be generated for a file in a supported provider by using the `presign` request.
+
+It is required to specify the operation to presign as a query parameter.
+The operations available are:
+- `download` - Generate a URL that can be used to download the file directly from the provider.
+- `upload` - Generate a URL that can be used to upload a file directly to the provider.
+
 Refer to the provider documentation for information about weather or not this is supported by that provider.
 
-Example: `GET /presign/s3provider/myfile.txt`
+Example: `GET /presign/s3provider/myfile.txt?op=download`
 
 This will return a signed URL that can be used to download the file directly from the service behind the provider without going through the file-butler proxy.
 
