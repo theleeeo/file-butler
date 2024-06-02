@@ -25,6 +25,9 @@ const (
 	ProviderTypeLog ProviderType = "log"
 	// ProviderTypeS3 is a provider that uses AWS S3
 	ProviderTypeS3 ProviderType = "s3"
+	// ProviderTypeGocloud is a provider that uses the gocloud.dev CDK
+	// This will support all the providers that gocloud supports including S3, Azure, Google Cloud, file and in-memory
+	ProviderTypeGocloud ProviderType = "gocloud"
 )
 
 type Config interface {

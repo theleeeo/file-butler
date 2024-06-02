@@ -149,6 +149,8 @@ func reloadProvidersFunc(pvp *viper.Viper, srv *server.Server) func(fsnotify.Eve
 		for _, id := range providersToDelete {
 			srv.RemoveProvider(id)
 		}
+
+		log.Println("Providers reloaded")
 	}
 }
 
@@ -196,6 +198,8 @@ func loadProviders(pvp *viper.Viper) ([]provider.Provider, error) {
 			cfg, err = unmarshalProviderCfg[*provider.LogConfig](id, v)
 		case string(provider.ProviderTypeS3):
 			cfg, err = unmarshalProviderCfg[*provider.S3Config](id, v)
+		case string(provider.ProviderTypeGocloud):
+			cfg, err = unmarshalProviderCfg[*provider.GocloudConfig](id, v)
 		default:
 			return nil, fmt.Errorf("unknown provider type: %s", providerType)
 		}
@@ -214,6 +218,8 @@ func loadProviders(pvp *viper.Viper) ([]provider.Provider, error) {
 			p = provider.NewVoidProvider(cfg)
 		case *provider.LogConfig:
 			p = provider.NewLogProvider(cfg)
+		case *provider.GocloudConfig:
+			p, err = provider.NewGocloudProvider(cfg)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("unable to create provider %s: %w", id, err)
