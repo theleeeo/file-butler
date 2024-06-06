@@ -331,6 +331,51 @@ func (s *Server) handlePresign(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(url))
 }
 
+func (s *Server) handleMetadata(w http.ResponseWriter, r *http.Request) {
+	providerName := r.PathValue("provider")
+	p := s.getProvider(providerName)
+	if p == nil {
+		http.Error(w, "provider not found", http.StatusNotFound)
+		return
+	}
+
+	key := strings.TrimPrefix(r.URL.Path, "/meta/"+providerName+"/")
+	if key == "" {
+		http.Error(w, "key is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.authorizeRequest(r.Context(), authorization.RequestType_REQUEST_TYPE_GET_METADATA, r.Header, key, p); err != nil {
+		lerr.ToHTTP(w, err)
+		return
+	}
+
+	tags, err := p.GetTags(r.Context(), key)
+	if err != nil {
+		if errors.Is(err, provider.ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type metadataResponse struct {
+		Tags map[string]string `json:"tags,omitempty"`
+	}
+
+	metadata := metadataResponse{
+		Tags: tags,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(metadata); err != nil {
+		log.Println("error encoding metadata:", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 	providerName := r.PathValue("provider")
 	p := s.getProvider(providerName)
@@ -345,7 +390,7 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.authorizeRequest(r.Context(), authorization.RequestType_REQUEST_TYPE_GET_TAGS, r.Header, key, p); err != nil {
+	if err := s.authorizeRequest(r.Context(), authorization.RequestType_REQUEST_TYPE_GET_METADATA, r.Header, key, p); err != nil {
 		lerr.ToHTTP(w, err)
 		return
 	}

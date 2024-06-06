@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"strings"
 
 	"gocloud.dev/blob"
 	_ "gocloud.dev/blob/azureblob"
@@ -13,6 +12,7 @@ import (
 	_ "gocloud.dev/blob/gcsblob"
 	_ "gocloud.dev/blob/memblob"
 	_ "gocloud.dev/blob/s3blob"
+	"gocloud.dev/gcerrors"
 )
 
 type GocloudConfig struct {
@@ -57,7 +57,7 @@ func (n *GocloudProvider) AuthPlugin() string {
 func (n *GocloudProvider) GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error) {
 	r, err := n.bucket.NewReader(ctx, key, nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "blob not found") {
+		if gcerrors.Code(err) == gcerrors.NotFound {
 			return nil, ObjectInfo{}, ErrNotFound
 		}
 		return nil, ObjectInfo{}, err

@@ -1,5 +1,6 @@
 # file-butler
 A multi-source file proxy with custom auth
+This is still a work in progress. More features will be added and breaking changes may occur.
 
 ## Providers
 
@@ -41,6 +42,8 @@ If no profile is specified, the provider will use the default credentials.
 ### Log
 
 ### Void
+
+### CDK
 
 ## Auth-plugins
 
@@ -114,7 +117,21 @@ Please note that the functionality described in this section is experimental and
 Tags is key:value pairs that can be attached to files. Tags carry no meaning to the file-butler service, but can be used to store metadata about the file in the provider.
 
 Tags must be set as query parameters in the request URL when uploading a file. The format is `?tag=key:value&tag=key:value&...`.
-Example: `PUT /tags/s3provider/myfile.txt?tag=author:john&tag=type:document`
+Example: `PUT /file/s3provider/myfile.txt?tag=author:john&tag=type:document`
 
 This is not supported for all providers and for some providers, not including the tags when updating an existing files will cause the tags to be removed.
 Please refer to the provider documentation for more information.
+
+The tags can be retrieved by using the `meta` request.
+Example: `GET /meta/s3provider/myfile.txt`
+
+This will return a JSON object with the tags as key:values of the field `tags`.
+Example response:
+```json
+{
+  "tags": {
+    "author": "john",
+    "type": "document"
+  }
+}
+```

@@ -22,8 +22,8 @@ func NewAllowTypesPlugin(args []string) (*AllowTypesPlugin, error) {
 			reqType = authorization.RequestType_REQUEST_TYPE_DOWNLOAD
 		case "upload":
 			reqType = authorization.RequestType_REQUEST_TYPE_UPLOAD
-		case "get_tags":
-			reqType = authorization.RequestType_REQUEST_TYPE_GET_TAGS
+		case "get_tags", "get_metadata": // get_tags is here for backwards compatibility, can be removed once the /tags request is removed
+			reqType = authorization.RequestType_REQUEST_TYPE_GET_METADATA
 		default:
 			return nil, status.Error(codes.InvalidArgument, "unknown request type: "+arg)
 		}
