@@ -92,6 +92,10 @@ Files can be uploaded to a provider by using the `file` request with a `PUT` or 
 Example: `PUT /file/s3provider/myfile.txt`
 This will upload the file `myfile.txt` to the `s3provider`.
 
+If a Content-Type header is present in the request, it will be passed on to the provider.
+If the provider supports it, that will be persisted with the file and returned in the response.
+If no Content-Type header is present, the server will try to determine the content type of the file.
+
 Deleting files is currently not supported.
 
 ### Presigned URLs
