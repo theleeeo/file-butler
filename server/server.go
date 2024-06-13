@@ -74,7 +74,7 @@ func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
 
 	s.srv = &http.Server{
 		Addr:              serverCfg.Addr,
-		Handler:           InternalErrorRedacter()(mux),
+		Handler:           InternalErrorRedacter(CorsMiddleware(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       10 * time.Second,
 	}
