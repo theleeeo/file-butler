@@ -27,7 +27,7 @@ func NewGocloudProvider(cfg *GocloudConfig) (*GocloudProvider, error) {
 
 	bucket, err := blob.OpenBucket(context.Background(), cfg.DriverURL)
 	if err != nil {
-		return nil, fmt.Errorf("could not open bucket: %v", err)
+		return nil, fmt.Errorf("could not open bucket: %w", err)
 	}
 
 	// defer bucket.Close()
@@ -71,7 +71,7 @@ func (n *GocloudProvider) GetObject(ctx context.Context, key string, opts GetOpt
 	}, nil
 }
 
-func (n *GocloudProvider) PutObject(ctx context.Context, key string, data io.Reader, _ int64, tags map[string]string) error {
+func (n *GocloudProvider) PutObject(ctx context.Context, key string, data io.Reader, opts PutOptions) error {
 	writeCtx, cancelWrite := context.WithCancel(ctx)
 	defer cancelWrite()
 
@@ -91,6 +91,6 @@ func (n *GocloudProvider) PutObject(ctx context.Context, key string, data io.Rea
 }
 
 func (n *GocloudProvider) GetTags(ctx context.Context, key string) (map[string]string, error) {
-	log.Printf("GetTags %s\n", key)
+	log.Println("GetTags not implemented for gocloud provider")
 	return nil, nil
 }

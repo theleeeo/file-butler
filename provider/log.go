@@ -37,17 +37,17 @@ func (n *LogProvider) GetObject(ctx context.Context, key string, opts GetOptions
 	return io.NopCloser(strings.NewReader("Hello World!\n")), ObjectInfo{}, nil
 }
 
-func (n *LogProvider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {
+func (n *LogProvider) PutObject(ctx context.Context, key string, data io.Reader, opts PutOptions) error {
 	var l string
-	if length < 1024 {
-		l = fmt.Sprintf("%db", length)
-	} else if length < 1024*1024 {
-		l = fmt.Sprintf("%dkb", length/1024)
+	if opts.ContentLength < 1024 {
+		l = fmt.Sprintf("%db", opts.ContentLength)
+	} else if opts.ContentLength < 1024*1024 {
+		l = fmt.Sprintf("%dkb", opts.ContentLength/1024)
 	} else {
-		l = fmt.Sprintf("%dmb", length/1024/1024)
+		l = fmt.Sprintf("%dmb", opts.ContentLength/1024/1024)
 	}
 
-	log.Printf("PutObject key=%s, size=%s\n, tags=%v", key, l, tags)
+	log.Printf("PutObject key=%s, size=%s\n, tags=%v", key, l, opts.Tags)
 	return nil
 }
 

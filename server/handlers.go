@@ -71,6 +71,10 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Length", fmt.Sprint(*objectInfo.ContentLength))
 		}
 
+		if objectInfo.ContentType != nil {
+			w.Header().Set("Content-Type", *objectInfo.ContentType)
+		}
+
 		if _, err := io.Copy(w, data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -118,7 +122,16 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 		return err
 	}
 
-	if err := prov.PutObject(r.Context(), key, dataSrc, contentLength, tags); err != nil {
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = http.DetectContentType(nil)
+	}
+
+	if err := prov.PutObject(r.Context(), key, dataSrc, provider.PutOptions{
+		ContentType:   contentType,
+		ContentLength: contentLength,
+		Tags:          tags,
+	}); err != nil {
 		if errors.Is(err, provider.ErrDenied) {
 			return lerr.Wrap(err, http.StatusForbidden, "error uploading object")
 		}

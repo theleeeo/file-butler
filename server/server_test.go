@@ -223,6 +223,7 @@ func Test_Upload_NotAllowed(t *testing.T) {
 		assert.Equal(t, "permission denied: request type is not allowed\n", string(d))
 	})
 }
+
 func Test_Upload(t *testing.T) {
 	plg, err := authPlugin.NewPlugin(authPlugin.Config{
 		Name:    "default",
@@ -253,7 +254,11 @@ func Test_Upload(t *testing.T) {
 	}()
 
 	t.Run("Put object", func(t *testing.T) {
-		prov.On("PutObject", mock.Anything, "123", []byte("hello"), int64(5), map[string]string(nil)).Return(nil).Once()
+		prov.On("PutObject", mock.Anything, "123", []byte("hello"), provider.PutOptions{
+			ContentType:   "text/plain; charset=utf-8",
+			ContentLength: int64(5),
+			Tags:          map[string]string(nil),
+		}).Return(nil).Once()
 
 		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
@@ -266,7 +271,11 @@ func Test_Upload(t *testing.T) {
 	})
 
 	t.Run("Multi-slash key", func(t *testing.T) {
-		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), int64(5), map[string]string(nil)).Return(nil).Once()
+		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), provider.PutOptions{
+			ContentType:   "text/plain; charset=utf-8",
+			ContentLength: int64(5),
+			Tags:          map[string]string(nil),
+		}).Return(nil).Once()
 
 		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc", port), strings.NewReader("hello"))
 		assert.NoError(t, err)
@@ -279,9 +288,13 @@ func Test_Upload(t *testing.T) {
 	})
 
 	t.Run("With tags", func(t *testing.T) {
-		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), int64(5), map[string]string{
-			"abc":  "123",
-			"pepe": "frog",
+		prov.On("PutObject", mock.Anything, "123/456/abc", []byte("hello"), provider.PutOptions{
+			ContentType:   "text/plain; charset=utf-8",
+			ContentLength: int64(5),
+			Tags: map[string]string{
+				"abc":  "123",
+				"pepe": "frog",
+			},
 		}).Return(nil).Once()
 
 		req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/file/mock/123/456/abc?tag=abc:123&tag=pepe:frog", port), strings.NewReader("hello"))

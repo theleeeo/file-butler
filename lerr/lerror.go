@@ -46,7 +46,7 @@ func Wrap(err error, code int, message string) *DetailedError {
 // Code returns the code of the error if it implements the Code method.
 // Otherwise returns the UnknownErrorCode.
 func Code(err error) int {
-	if e, ok := err.(interface{ Code() int }); ok {
+	if e, ok := err.(interface{ Code() int }); ok { //nolint:errorlint // Only check top-level error.
 		return e.Code()
 	}
 	return UnknownErrorCode

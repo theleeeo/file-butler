@@ -112,16 +112,17 @@ func (s *S3Provider) GetObject(ctx context.Context, key string, opts GetOptions)
 		return nil, ObjectInfo{}, err
 	}
 
-	return getResp.Body, ObjectInfo{LastModified: getResp.LastModified, ContentLength: getResp.ContentLength}, nil
+	return getResp.Body, ObjectInfo{LastModified: getResp.LastModified, ContentLength: getResp.ContentLength, ContentType: getResp.ContentType}, nil
 }
 
-func (s *S3Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {
+func (s *S3Provider) PutObject(ctx context.Context, key string, data io.Reader, opts PutOptions) error {
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        &s.bucketName,
 		Key:           &key,
 		Body:          data,
-		ContentLength: &length,
-		Tagging:       buildTagging(tags),
+		ContentLength: &opts.ContentLength,
+		Tagging:       buildTagging(opts.Tags),
+		ContentType:   &opts.ContentType,
 	})
 	if err != nil {
 		return err

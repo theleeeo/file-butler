@@ -60,13 +60,13 @@ func (p *Provider) GetObject(ctx context.Context, key string, opts provider.GetO
 	return rc, called.Get(1).(provider.ObjectInfo), nil
 }
 
-func (p *Provider) PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error {
+func (p *Provider) PutObject(ctx context.Context, key string, data io.Reader, opts provider.PutOptions) error {
 	completeData, err := io.ReadAll(data)
 	if err != nil {
 		panic(err)
 	}
 
-	called := p.Called(ctx, key, completeData, length, tags)
+	called := p.Called(ctx, key, completeData, opts)
 	return called.Error(0)
 }
 

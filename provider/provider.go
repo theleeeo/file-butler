@@ -51,7 +51,7 @@ type Provider interface {
 	AuthPlugin() string
 
 	GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error)
-	PutObject(ctx context.Context, key string, data io.Reader, length int64, tags map[string]string) error
+	PutObject(ctx context.Context, key string, data io.Reader, opts PutOptions) error
 	GetTags(ctx context.Context, key string) (map[string]string, error)
 }
 
@@ -59,6 +59,16 @@ type GetOptions struct {
 	// If specified, the provider should only return the object if it has not been modified since this time, otherwise return ErrNotModified
 	// If zero, the provider should return the object regardless of its modification time
 	LastModified *time.Time
+}
+
+type PutOptions struct {
+	// The content type of the object
+	ContentType string
+
+	ContentLength int64
+
+	// The tags to apply to the object
+	Tags map[string]string
 }
 
 // ObjectInfo contains metadata about an object
@@ -69,6 +79,9 @@ type ObjectInfo struct {
 
 	// The length of the object in bytes
 	ContentLength *int64
+
+	// The content type of the object
+	ContentType *string
 }
 
 type PresignOperation string
