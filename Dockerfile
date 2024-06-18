@@ -16,4 +16,4 @@ WORKDIR /app
 
 COPY --from=builder /app/file-butler .
 
-CMD ["./file-butler"]
+ENTRYPOINT ["./file-butler"]
