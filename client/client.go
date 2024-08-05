@@ -1,6 +1,6 @@
 // Description: This file contains the implementation of the client that will be used to interact with the server.
 // The client will be used to upload, download and get tags of files.
-package sdk
+package client
 
 import (
 	"bytes"
@@ -47,21 +47,30 @@ func New(baseUrl string, timeout time.Duration) (*Client, error) {
 // Upload uploads a file to the server. The path is the path to the file that will be uploaded. The filename is the name of the file that will be uploaded.
 // For example:
 //
-//		path: /inventory/vendors/logos
-//		filename: huawei-main-x450.png
-//		tags: map[string]string{"vendor": "huawei", "type": "main"}
-//	  	data: []byte{...} // The content of the file
+//   - data: []byte{...}
+//   - path: "/inventory/vendors/logos"
+//   - filename: "huawei-main-x450.png"
+//   - tags: map[string]string{"vendor": "huawei", "type": "main"}
 //
 // The tags are the metadata that will be associated with the file. The data is the content of the file that will be uploaded.
 // If the file already exists, it will be overwritten. If the file does not exist, it will be created.
-func (c *Client) Upload(ctx context.Context, path string, filename string, tags map[string]string, data []byte) error {
+func (c *Client) Upload(ctx context.Context, data []byte, path string, filename string, tags map[string]string) error {
 
-	url, err := url.JoinPath(c.baseUrl, path, filename)
+	reqUrl, err := url.JoinPath(c.baseUrl, path, filename)
 	if err != nil {
 		return fmt.Errorf("cannot create path url: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	if len(tags) > 0 {
+		values := url.Values{}
+		// set tags
+		for k, v := range tags {
+			values.Set(k, v)
+		}
+		reqUrl = reqUrl + "?" + values.Encode()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqUrl, bytes.NewBuffer(data))
 	if err != nil {
 		return err
 	}
