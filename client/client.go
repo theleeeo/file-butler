@@ -42,15 +42,17 @@ func New(baseUrl string, timeout time.Duration) (*Client, error) {
 }
 
 // Upload uploads a file to the server. The path is the path to the file that will be uploaded. The filename is the name of the file that will be uploaded.
-func (c *Client) Upload(path string, filename string, tags map[string]string) {
-	// upload file
+func (c *Client) Upload(path string, filename string, tags map[string]string) error {
+	return nil
 }
 
 // Download downloads a file from the server. The path is the path to the file that will be downloaded. The filename is the name of the file that will be downloaded.
-func (c *Client) Download() {
-	// download file
+func (c *Client) Download(filePath string) ([]byte, error) {
+	return nil, nil
 }
 
 // GetTags gets the tags of a file from the server. The path is the path to the file that the tags will be retrieved from.
-func (c *Client) GetTags() {
+// The tags are returned as a map of string to string. If the file does not exist, an error will be returned.
+func (c *Client) GetTags(filePath string) (map[string]string, error) {
+	return nil, nil
 }
