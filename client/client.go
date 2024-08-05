@@ -3,7 +3,10 @@
 package sdk
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -42,7 +45,42 @@ func New(baseUrl string, timeout time.Duration) (*Client, error) {
 }
 
 // Upload uploads a file to the server. The path is the path to the file that will be uploaded. The filename is the name of the file that will be uploaded.
-func (c *Client) Upload(path string, filename string, tags map[string]string) error {
+// For example:
+//
+//		path: /inventory/vendors/logos
+//		filename: huawei-main-x450.png
+//		tags: map[string]string{"vendor": "huawei", "type": "main"}
+//	  	data: []byte{...} // The content of the file
+//
+// The tags are the metadata that will be associated with the file. The data is the content of the file that will be uploaded.
+// If the file already exists, it will be overwritten. If the file does not exist, it will be created.
+func (c *Client) Upload(ctx context.Context, path string, filename string, tags map[string]string, data []byte) error {
+
+	url, err := url.JoinPath(c.baseUrl, path, filename)
+	if err != nil {
+		return fmt.Errorf("cannot create path url: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("could not upload file: %s", string(respBody))
+	}
+
 	return nil
 }
 
