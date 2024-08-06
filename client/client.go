@@ -103,3 +103,65 @@ func (c *Client) Download(filePath string) ([]byte, error) {
 func (c *Client) GetTags(filePath string) (map[string]string, error) {
 	return nil, nil
 }
+
+type Option struct {
+	baseUrl string
+	timeout time.Duration
+	tags    map[string]string
+	ctx     context.Context
+}
+
+type optionFunc func(*Option)
+
+func WithBaseUrl(baseUrl string) optionFunc {
+	return func(o *Option) {
+		o.baseUrl = baseUrl
+	}
+}
+
+func WithTimeout(timeout time.Duration) optionFunc {
+	return func(o *Option) {
+		o.timeout = timeout
+	}
+}
+
+func WithTags(tags map[string]string) optionFunc {
+	return func(o *Option) {
+		o.tags = tags
+	}
+}
+
+func WithContext(ctx context.Context) optionFunc {
+	return func(o *Option) {
+		o.ctx = ctx
+	}
+}
+
+// Quick upload that creates the client and uploads the file in one go.
+// use with Options to set the base url, timeout, tags and context.
+// e.g
+//
+//	Upload("/folder/to/store/in", "filename.jpg", []byte("imageDataBytes"),
+//		WithBaseUrl("http://localhost:8080"),
+//		WithTimeout(10*time.Second),
+//		WithTags(map[string]string{"tag1": "tag1value", "tag2": "tag2value"}),
+//	 )
+func Upload(path string, filename string, data []byte, opts ...optionFunc) error {
+	o := &Option{
+		baseUrl: "http://localhost:8080",
+		timeout: 10 * time.Second,
+	}
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	client, err := New(o.baseUrl, o.timeout)
+	if err != nil {
+		return err
+	}
+	if o.ctx == nil {
+		o.ctx = context.Background()
+	}
+
+	return client.Upload(o.ctx, data, path, filename, o.tags)
+}
