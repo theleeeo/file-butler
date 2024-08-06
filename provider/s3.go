@@ -252,33 +252,3 @@ func (s *S3Provider) GetTags(ctx context.Context, key string) (map[string]string
 
 	return tags, nil
 }
-
-// func (s *S3Provider) ListObjects() ([]ObjectInfo, error) {
-// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-// 	defer cancel()
-
-// 	output, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-// 		Bucket: &s.bucketName,
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	objects := make([]ObjectInfo, len(output.Contents))
-// 	for i, obj := range output.Contents {
-// 		objects[i] = ObjectInfo{
-// 			Key:      *obj.Key,
-// 			Metadata: map[string]interface{}{},
-// 		}
-
-// 		if obj.Size != nil {
-// 			objects[i].Metadata["size"] = *obj.Size
-// 		}
-
-// 		if obj.LastModified != nil {
-// 			objects[i].Metadata["last_modified"] = *obj.LastModified
-// 		}
-// 	}
-
-// 	return objects, nil
-// }
