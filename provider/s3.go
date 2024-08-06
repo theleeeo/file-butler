@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"time"
 
@@ -77,6 +76,12 @@ func (s *S3Provider) ListObjects(ctx context.Context, prefix string) ([]ListObje
 	var continuationToken *string
 	objects := make([]types.Object, 0)
 
+	if _, noDeadline := ctx.Deadline(); !noDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+	}
+
 	// loop until all pages are retrieved
 	for {
 		input := &s3.ListObjectsV2Input{
@@ -85,10 +90,14 @@ func (s *S3Provider) ListObjects(ctx context.Context, prefix string) ([]ListObje
 			ContinuationToken: continuationToken,
 		}
 
-		// Call to list objects
 		result, err := s.client.ListObjectsV2(ctx, input)
 		if err != nil {
-			log.Fatal(err)
+			//
+			if strings.Contains(err.Error(), "AccessDenied") {
+				return nil, ErrDenied
+			}
+
+			return nil, err
 		}
 
 		// Append objects from current page to the list
