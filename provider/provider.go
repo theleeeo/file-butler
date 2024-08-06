@@ -53,7 +53,7 @@ type Provider interface {
 	GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error)
 
 	// list objects given a specific prefix
-	ListObjects(ctx context.Context, prefix string) ([]string, error)
+	ListObjects(ctx context.Context, prefix string) ([]ListObject, error)
 
 	PutObject(ctx context.Context, key string, data io.Reader, opts PutOptions) error
 	GetTags(ctx context.Context, key string) (map[string]string, error)
@@ -86,6 +86,8 @@ type ObjectInfo struct {
 
 	// The content type of the object
 	ContentType *string
+
+	Key string
 }
 
 type PresignOperation string
@@ -97,4 +99,18 @@ const (
 
 type Presigner interface {
 	PresignURL(ctx context.Context, key string, direction PresignOperation) (string, error)
+}
+
+type ListObject struct {
+	// When the object was last modified
+	LastModified *time.Time `json:"last_modified"`
+
+	// The length of the object in bytes
+	Size *int64 `json:"size"`
+
+	// The key of the object
+	Key string `json:"key"`
+
+	// Prefix for the object
+	Prefix string `json:"prefix"`
 }

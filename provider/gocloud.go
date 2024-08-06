@@ -96,12 +96,12 @@ func (n *GocloudProvider) GetTags(ctx context.Context, key string) (map[string]s
 	return nil, nil
 }
 
-func (n *GocloudProvider) ListObjects(ctx context.Context, prefix string) ([]string, error) {
+func (n *GocloudProvider) ListObjects(ctx context.Context, prefix string) ([]ListObject, error) {
 	iter := n.bucket.List(&blob.ListOptions{
 		Prefix: prefix,
 	})
 
-	var objects []string
+	var objects []ListObject
 	for {
 		obj, err := iter.Next(ctx)
 
@@ -113,7 +113,12 @@ func (n *GocloudProvider) ListObjects(ctx context.Context, prefix string) ([]str
 			return nil, err
 		}
 
-		objects = append(objects, obj.Key)
+		objects = append(objects, ListObject{
+			LastModified: &obj.ModTime,
+			Size:         &obj.Size,
+			Key:          obj.Key,
+			Prefix:       prefix,
+		})
 	}
 
 	return objects, nil

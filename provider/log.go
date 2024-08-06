@@ -56,7 +56,7 @@ func (n *LogProvider) GetTags(ctx context.Context, key string) (map[string]strin
 	return nil, nil
 }
 
-func (n *LogProvider) ListObjects(ctx context.Context, prefix string) ([]string, error) {
+func (n *LogProvider) ListObjects(ctx context.Context, prefix string) ([]ListObject, error) {
 	log.Printf("ListObjects %s\n", prefix)
 	return nil, nil
 }

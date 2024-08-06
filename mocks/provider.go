@@ -79,12 +79,12 @@ func (p *Provider) GetTags(ctx context.Context, key string) (map[string]string, 
 	return called.Get(0).(map[string]string), called.Error(1)
 }
 
-func (p *Provider) ListObjects(ctx context.Context, prefix string) ([]string, error) {
+func (p *Provider) ListObjects(ctx context.Context, prefix string) ([]provider.ListObject, error) {
 	called := p.Called(ctx, prefix)
 	if called.Get(0) == nil {
 		return nil, called.Error(1)
 	}
 
-	return called.Get(0).([]string), called.Error(1)
+	return called.Get(0).([]provider.ListObject), called.Error(1)
 
 }

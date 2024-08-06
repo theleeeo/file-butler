@@ -73,7 +73,7 @@ func (s *S3Provider) AuthPlugin() string {
 }
 
 // list objects given a specific prefix
-func (s *S3Provider) ListObjects(ctx context.Context, prefix string) ([]string, error) {
+func (s *S3Provider) ListObjects(ctx context.Context, prefix string) ([]ListObject, error) {
 	var continuationToken *string
 	objects := make([]types.Object, 0)
 
@@ -103,10 +103,15 @@ func (s *S3Provider) ListObjects(ctx context.Context, prefix string) ([]string, 
 		continuationToken = result.NextContinuationToken
 	}
 
-	result := make([]string, len(objects))
+	result := make([]ListObject, len(objects))
 
 	for n, obj := range objects {
-		result[n] = *obj.Key
+		result[n] = ListObject{
+			Prefix:       prefix,
+			Key:          *obj.Key,
+			LastModified: obj.LastModified,
+			Size:         obj.Size,
+		}
 	}
 
 	return result, nil

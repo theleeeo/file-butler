@@ -429,7 +429,7 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 }
 
 type ListResponse struct {
-	Objects []string `json:"objects"`
+	Objects []provider.ListObject `json:"objects"`
 }
 
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
