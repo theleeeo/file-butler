@@ -18,6 +18,8 @@ func NewAllowTypesPlugin(args []string) (*AllowTypesPlugin, error) {
 	for i, arg := range args {
 		var reqType authorization.RequestType
 		switch arg {
+		case "list":
+			reqType = authorization.RequestType_REQUEST_TYPE_LIST_FILES
 		case "download":
 			reqType = authorization.RequestType_REQUEST_TYPE_DOWNLOAD
 		case "upload":

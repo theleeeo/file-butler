@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"strings"
 	"time"
 
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 var _ Provider = &S3Provider{}
@@ -67,6 +70,46 @@ func (s *S3Provider) Id() string {
 
 func (s *S3Provider) AuthPlugin() string {
 	return s.authPlugin
+}
+
+// list objects given a specific prefix
+func (s *S3Provider) ListObjects(ctx context.Context, prefix string) ([]string, error) {
+	var continuationToken *string
+	objects := make([]types.Object, 0)
+
+	// loop until all pages are retrieved
+	for {
+		input := &s3.ListObjectsV2Input{
+			Bucket:            aws.String(s.bucketName),
+			Prefix:            aws.String(prefix),
+			ContinuationToken: continuationToken,
+		}
+
+		// Call to list objects
+		result, err := s.client.ListObjectsV2(ctx, input)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Append objects from current page to the list
+		objects = append(objects, result.Contents...)
+
+		// Check if there are more pages to retrieve
+		if !*result.IsTruncated {
+			break
+		}
+
+		// Set continuation token for the next page
+		continuationToken = result.NextContinuationToken
+	}
+
+	result := make([]string, len(objects))
+
+	for n, obj := range objects {
+		result[n] = *obj.Key
+	}
+
+	return result, nil
 }
 
 func (s *S3Provider) GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error) {

@@ -71,6 +71,7 @@ func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
 	mux.HandleFunc("/presign/{provider}/", s.handlePresign)
 	mux.HandleFunc("/tags/{provider}/", s.handleTags)
 	mux.HandleFunc("/meta/{provider}/", s.handleMetadata)
+	mux.HandleFunc("/list/{provider}/", s.handleList)
 
 	s.srv = &http.Server{
 		Addr:              serverCfg.Addr,

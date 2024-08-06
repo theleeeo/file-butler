@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -93,4 +94,27 @@ func (n *GocloudProvider) PutObject(ctx context.Context, key string, data io.Rea
 func (n *GocloudProvider) GetTags(ctx context.Context, key string) (map[string]string, error) {
 	log.Println("GetTags not implemented for gocloud provider")
 	return nil, nil
+}
+
+func (n *GocloudProvider) ListObjects(ctx context.Context, prefix string) ([]string, error) {
+	iter := n.bucket.List(&blob.ListOptions{
+		Prefix: prefix,
+	})
+
+	var objects []string
+	for {
+		obj, err := iter.Next(ctx)
+
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			return nil, err
+		}
+
+		objects = append(objects, obj.Key)
+	}
+
+	return objects, nil
 }

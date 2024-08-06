@@ -51,6 +51,10 @@ type Provider interface {
 	AuthPlugin() string
 
 	GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error)
+
+	// list objects given a specific prefix
+	ListObjects(ctx context.Context, prefix string) ([]string, error)
+
 	PutObject(ctx context.Context, key string, data io.Reader, opts PutOptions) error
 	GetTags(ctx context.Context, key string) (map[string]string, error)
 }

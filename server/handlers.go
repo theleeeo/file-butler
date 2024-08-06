@@ -427,3 +427,47 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
+
+type ListResponse struct {
+	Objects []string `json:"objects"`
+}
+
+func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
+	var reqType authorization.RequestType
+	switch r.Method {
+	case "GET":
+		reqType = authorization.RequestType_REQUEST_TYPE_LIST_FILES
+	default:
+		http.Error(w, "unsupported method", http.StatusMethodNotAllowed)
+	}
+
+	providerName := r.PathValue("provider")
+	p := s.getProvider(providerName)
+	if p == nil {
+		http.Error(w, "provider not found", http.StatusNotFound)
+		return
+	}
+
+	prefix := strings.TrimPrefix(r.URL.Path, "/list/"+providerName+"/")
+	if prefix == "" {
+		http.Error(w, "key is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.authorizeRequest(r.Context(), reqType, r.Header, prefix, p); err != nil {
+		lerr.ToHTTP(w, err)
+		return
+	}
+
+	objects, err := p.ListObjects(r.Context(), prefix)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := fmt.Fprint(w, ListResponse{Objects: objects}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+}
