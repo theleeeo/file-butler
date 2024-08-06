@@ -196,22 +196,28 @@ func (s *S3Provider) PresignURL(ctx context.Context, key string, op PresignOpera
 	var req *v4.PresignedHTTPRequest
 	var err error
 
-	if op == PresignOperationDownload {
+	switch op {
+	case PresignOperationDownload:
 		req, err = s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
 			Bucket: &s.bucketName,
 			Key:    &key,
 		})
-	} else if op == PresignOperationUpload {
+		if err != nil {
+			return "", err
+		}
+
+	case PresignOperationUpload:
 		req, err = s.presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
 			Bucket: &s.bucketName,
 			Key:    &key,
 		})
-	} else {
-		return "", fmt.Errorf("unsupported presign operation: %s", op)
-	}
+		if err != nil {
+			return "", err
+		}
 
-	if err != nil {
-		return "", err
+	default:
+		return "", fmt.Errorf("unsupported presign operation: %s", op)
+
 	}
 
 	return req.URL, nil
