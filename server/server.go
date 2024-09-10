@@ -68,10 +68,10 @@ func NewServer(serverCfg Config, plugins []authPlugin.Plugin) (*Server, error) {
 	mux := http.NewServeMux()
 	// Use a prefix for the file-route as well to avoid having to deal with restricting providernames like "presign" and "tags"
 	mux.HandleFunc("/file/{provider}/", s.handleFile)
-	mux.HandleFunc("/presign/{provider}/", s.handlePresign)
-	mux.HandleFunc("/tags/{provider}/", s.handleTags)
-	mux.HandleFunc("/meta/{provider}/", s.handleMetadata)
-
+	mux.HandleFunc("POST /presign/{provider}/", s.handlePresign)
+	mux.HandleFunc("GET /tags/{provider}/", s.handleTags)
+	mux.HandleFunc("GET /meta/{provider}/", s.handleMetadata)
+	mux.HandleFunc("GET /list/{provider}/", s.handleList)
 	s.srv = &http.Server{
 		Addr:              serverCfg.Addr,
 		Handler:           InternalErrorRedacter(CorsMiddleware(mux)),

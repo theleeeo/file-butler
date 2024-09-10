@@ -20,9 +20,10 @@
 # Go workspace file
 go.work
 
-dev
-
+dev/
 .air.toml
+tmp/
+plugins/
 
 config.*
 *.config.*
@@ -31,5 +32,3 @@ config.*
 providers.*
 *.providers.*
 !providers.example.*
-
-plugins/
