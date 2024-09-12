@@ -112,7 +112,6 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 
 		body, err := io.ReadAll(dataSrc)
 		if err != nil {
-			fmt.Println("error:", err)
 			return err
 		}
 		contentLength = int64(len(body))
@@ -434,7 +433,6 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prefix := strings.TrimPrefix(r.URL.Path, "/list/"+providerName+"/")
-	fmt.Println("prefix:", prefix)
 
 	if err := s.authorizeRequest(r.Context(), authorization.RequestType_REQUEST_TYPE_LIST, r.Header, prefix, p); err != nil {
 		lerr.ToHTTP(w, err)
