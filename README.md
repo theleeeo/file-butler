@@ -89,12 +89,12 @@ All endpoints take the form of `/<request>/<provider>/<key>`.
 ### Files
 
 Files (or any arbitrary data) can be retrieved from a provider by using the `file` request.
-Example: `GET /file/s3provider/myfile.txt`
-This will try to return the file `myfile.txt` from the `s3provider`.
+Example: `GET /file/testprovider/myfile.txt`
+This will try to return the file `myfile.txt` from the `testprovider`.
 
 Files can be uploaded to a provider by using the `file` request with a `PUT` or `POST` method..
-Example: `PUT /file/s3provider/myfile.txt`
-This will upload the file `myfile.txt` to the `s3provider`.
+Example: `PUT /file/testprovider/myfile.txt`
+This will upload the file `myfile.txt` to the `testprovider`.
 
 If a Content-Type header is present in the request, it will be passed on to the provider.
 If the provider supports it, that will be persisted with the file and returned in the response.
@@ -114,7 +114,7 @@ The operations available are:
 
 Refer to the provider documentation for information about weather or not this is supported by that provider.
 
-Example: `GET /presign/s3provider/myfile.txt?op=download`
+Example: `GET /presign/testprovider/myfile.txt?op=download`
 
 This will return a signed URL that can be used to download the file directly from the service behind the provider without going through the file-butler proxy.
 
@@ -127,13 +127,13 @@ Please note that the functionality described in this section is experimental and
 Tags is key:value pairs that can be attached to files. Tags carry no meaning to the file-butler service, but can be used to store metadata about the file in the provider.
 
 Tags must be set as query parameters in the request URL when uploading a file. The format is `?tag=key:value&tag=key:value&...`.
-Example: `PUT /file/s3provider/myfile.txt?tag=author:john&tag=type:document`
+Example: `PUT /file/testprovider/myfile.txt?tag=author:john&tag=type:document`
 
 This is not supported for all providers and for some providers, not including the tags when updating an existing files will cause the tags to be removed.
 Please refer to the provider documentation for more information.
 
 The tags can be retrieved by using the `meta` request.
-Example: `GET /meta/s3provider/myfile.txt`
+Example: `GET /meta/testprovider/myfile.txt`
 
 This will return a JSON object with the tags as key:values of the field `tags`.
 Example response:
@@ -150,12 +150,33 @@ Example response:
 #### List
 
 The `list` request can be used to list all files in a provider.
-Example: `GET /list/s3provider/`
+Example: `GET /list/testprovider/`
 
 Example response:
 
 ```json
 {
   "keys": ["file1.txt", "file2.json", "folder/hello.png"]
+}
+```
+
+Any text in the URL path after the provider key will be used as a prefix to filter the results.
+Example: `GET /list/testprovider/folder/`
+
+Example response:
+
+```json
+{
+  "keys": ["folder/hello.png"]
+}
+```
+
+Example: `GET /list/testprovider/file`
+
+Example response:
+
+```json
+{
+  "keys": ["file1.txt", "file2.json"]
 }
 ```
