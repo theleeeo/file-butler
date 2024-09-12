@@ -42,6 +42,6 @@ func (n *VoidProvider) GetTags(ctx context.Context, key string) (map[string]stri
 	return nil, nil
 }
 
-func (n *VoidProvider) ListObjects(ctx context.Context, prefix string) ([]string, error) {
-	return nil, nil
+func (n *VoidProvider) ListObjects(ctx context.Context, prefix string) (ListObjectsResponse, error) {
+	return ListObjectsResponse{}, nil
 }

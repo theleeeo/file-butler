@@ -201,16 +201,15 @@ func (s *S3Provider) GetTags(ctx context.Context, key string) (map[string]string
 
 // Does currently not support pagination but the default max is 1000 so it is fine for now.
 // Note for future developers: output.IsTruncated is a boolean that indicates if there are more objects to retrieve and output.NextContinuationToken is the token to use for the next request.
-func (s *S3Provider) ListObjects(ctx context.Context, prefix string) ([]string, error) {
+func (s *S3Provider) ListObjects(ctx context.Context, prefix string) (ListObjectsResponse, error) {
 	output, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: &s.bucketName,
 		Prefix: &prefix,
 	})
 	if err != nil {
-		return nil, err
+		return ListObjectsResponse{}, err
 	}
 
-	// objects := make([]ObjectInfo, len(output.Contents))
 	files := make([]string, len(output.Contents))
 	for i, obj := range output.Contents {
 		files[i] = *obj.Key
@@ -229,5 +228,7 @@ func (s *S3Provider) ListObjects(ctx context.Context, prefix string) ([]string, 
 		// }
 	}
 
-	return files, nil
+	return ListObjectsResponse{
+		Keys: files,
+	}, nil
 }

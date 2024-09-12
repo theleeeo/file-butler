@@ -1,4 +1,5 @@
 # file-butler
+
 A multi-source file proxy with custom auth
 This is still a work in progress. More features will be added and breaking changes may occur.
 
@@ -61,11 +62,14 @@ They does not require any plugins to be created by the user and have a substanti
 The `allow-types` plugin allows the user to specify which request types are allowed. It does not do any other checks.
 
 The available types are:
-- `download` (GET /file)
-- `upload` (PUT /file)
+
+- `download` (GET /file/)
+
+- `upload` (PUT / POST /file/)
 <!-- - `presign` (GET /presign) -->
-- `get_tags` (GET /tags)
+- `get_tags` (GET /tags/)
 <!-- - `set_tags` (PUT /tags) -->
+- `list` (GET /list/)
 
 Config example:
 
@@ -104,6 +108,7 @@ Presigned URLs can be generated for a file in a supported provider by using the 
 
 It is required to specify the operation to presign as a query parameter.
 The operations available are:
+
 - `download` - Generate a URL that can be used to download the file directly from the provider.
 - `upload` - Generate a URL that can be used to upload a file directly to the provider.
 
@@ -114,6 +119,7 @@ Example: `GET /presign/s3provider/myfile.txt?op=download`
 This will return a signed URL that can be used to download the file directly from the service behind the provider without going through the file-butler proxy.
 
 ### Experimental Features
+
 Please note that the functionality described in this section is experimental and subject to change. Use it at your own risk.
 
 #### Tags
@@ -131,6 +137,7 @@ Example: `GET /meta/s3provider/myfile.txt`
 
 This will return a JSON object with the tags as key:values of the field `tags`.
 Example response:
+
 ```json
 {
   "tags": {
@@ -138,4 +145,16 @@ Example response:
     "type": "document"
   }
 }
+```
+
+#### List
+
+The `list` request can be used to list all files in a provider.
+Example: `GET /list/s3provider/`
+
+This will return a JSON array with the keys of all files in the provider.
+Example response:
+
+```json
+["file1.txt", "file2.txt", "folder/file3.txt"]
 ```
