@@ -152,9 +152,10 @@ Example response:
 The `list` request can be used to list all files in a provider.
 Example: `GET /list/s3provider/`
 
-This will return a JSON array with the keys of all files in the provider.
 Example response:
 
 ```json
-["file1.txt", "file2.txt", "folder/file3.txt"]
+{
+  "keys": ["file1.txt", "file2.json", "folder/hello.png"]
+}
 ```
