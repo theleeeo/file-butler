@@ -26,4 +26,6 @@ message Header {
   repeated string values = 2;
 }
 
-message AuthorizeResponse {}
+message AuthorizeResponse {
+  bool authorized = 1;
+}

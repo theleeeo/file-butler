@@ -12,5 +12,12 @@ type GRPCServer struct {
 
 func (g *GRPCServer) Authorize(ctx context.Context, req *authorization.AuthorizeRequest) (*authorization.AuthorizeResponse, error) {
 	err := g.Impl.Authorize(ctx, req)
-	return &authorization.AuthorizeResponse{}, err
+	if err != nil {
+		return &authorization.AuthorizeResponse{
+			Authorized: false,
+		}, err
+	}
+	return &authorization.AuthorizeResponse{
+		Authorized: true,
+	}, nil
 }
