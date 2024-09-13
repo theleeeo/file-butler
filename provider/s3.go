@@ -199,32 +199,36 @@ func (s *S3Provider) GetTags(ctx context.Context, key string) (map[string]string
 	return tags, nil
 }
 
-// func (s *S3Provider) ListObjects() ([]ObjectInfo, error) {
-// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-// 	defer cancel()
+// Does currently not support pagination but the default max is 1000 so it is fine for now.
+// Note for future developers: output.IsTruncated is a boolean that indicates if there are more objects to retrieve and output.NextContinuationToken is the token to use for the next request.
+func (s *S3Provider) ListObjects(ctx context.Context, prefix string) (ListObjectsResponse, error) {
+	output, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: &s.bucketName,
+		Prefix: &prefix,
+	})
+	if err != nil {
+		return ListObjectsResponse{}, err
+	}
 
-// 	output, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-// 		Bucket: &s.bucketName,
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	files := make([]string, len(output.Contents))
+	for i, obj := range output.Contents {
+		files[i] = *obj.Key
 
-// 	objects := make([]ObjectInfo, len(output.Contents))
-// 	for i, obj := range output.Contents {
-// 		objects[i] = ObjectInfo{
-// 			Key:      *obj.Key,
-// 			Metadata: map[string]interface{}{},
-// 		}
+		// objects[i] = ObjectInfo{
+		// 	Key:      *obj.Key,
+		// 	Metadata: map[string]interface{}{},
+		// }
 
-// 		if obj.Size != nil {
-// 			objects[i].Metadata["size"] = *obj.Size
-// 		}
+		// if obj.Size != nil {
+		// 	objects[i].Metadata["size"] = *obj.Size
+		// }
 
-// 		if obj.LastModified != nil {
-// 			objects[i].Metadata["last_modified"] = *obj.LastModified
-// 		}
-// 	}
+		// if obj.LastModified != nil {
+		// 	objects[i].Metadata["last_modified"] = *obj.LastModified
+		// }
+	}
 
-// 	return objects, nil
-// }
+	return ListObjectsResponse{
+		Keys: files,
+	}, nil
+}

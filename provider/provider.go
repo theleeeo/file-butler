@@ -53,6 +53,7 @@ type Provider interface {
 	GetObject(ctx context.Context, key string, opts GetOptions) (io.ReadCloser, ObjectInfo, error)
 	PutObject(ctx context.Context, key string, data io.Reader, opts PutOptions) error
 	GetTags(ctx context.Context, key string) (map[string]string, error)
+	ListObjects(ctx context.Context, prefix string) (ListObjectsResponse, error)
 }
 
 type GetOptions struct {
@@ -82,6 +83,11 @@ type ObjectInfo struct {
 
 	// The content type of the object
 	ContentType *string
+}
+
+type ListObjectsResponse struct {
+	// The keys of the objects found
+	Keys []string
 }
 
 type PresignOperation string

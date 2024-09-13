@@ -24,12 +24,13 @@ const (
 func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 	var reqType authorization.RequestType
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		reqType = authorization.RequestType_REQUEST_TYPE_DOWNLOAD
-	case "PUT", "POST":
+	case http.MethodPut, http.MethodPost:
 		reqType = authorization.RequestType_REQUEST_TYPE_UPLOAD
 	default:
-		http.Error(w, "unsupported method", http.StatusMethodNotAllowed)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
 	providerName := r.PathValue("provider")
@@ -85,6 +86,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.handleUpload(r, p, key); err != nil {
 		lerr.ToHTTP(w, err)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -110,7 +112,6 @@ func (s *Server) handleUpload(r *http.Request, prov provider.Provider, key strin
 
 		body, err := io.ReadAll(dataSrc)
 		if err != nil {
-			fmt.Println("error:", err)
 			return err
 		}
 		contentLength = int64(len(body))
@@ -276,11 +277,6 @@ func (s *Server) authorizeRequest(ctx context.Context, reqType authorization.Req
 }
 
 func (s *Server) handlePresign(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "unsupported method", http.StatusMethodNotAllowed)
-		return
-	}
-
 	providerName := r.PathValue("provider")
 	p := s.getProvider(providerName)
 	if p == nil {
@@ -424,6 +420,35 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 		log.Println("error encoding tags:", err)
 		// If some part of the response was able to be written, the client will already have received a partial response and status code 200.
 		// This is for if the response was not able to be written at all.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
+	providerName := r.PathValue("provider")
+	p := s.getProvider(providerName)
+	if p == nil {
+		http.Error(w, "provider not found", http.StatusNotFound)
+		return
+	}
+
+	prefix := strings.TrimPrefix(r.URL.Path, "/list/"+providerName+"/")
+
+	if err := s.authorizeRequest(r.Context(), authorization.RequestType_REQUEST_TYPE_LIST, r.Header, prefix, p); err != nil {
+		lerr.ToHTTP(w, err)
+		return
+	}
+
+	objects, err := p.ListObjects(r.Context(), prefix)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(objects); err != nil {
+		log.Println("error encoding list:", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
