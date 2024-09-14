@@ -107,7 +107,7 @@ func validateUniquePluginNames(providers []authPlugin.Plugin) error {
 	return nil
 }
 
-func (s *Server) setPlugin(name string) authPlugin.Plugin {
+func (s *Server) getPlugin(name string) authPlugin.Plugin {
 	for _, p := range s.plugins {
 		if p.Name() == name {
 			return p
@@ -126,7 +126,7 @@ func (s *Server) RegisterProvider(p provider.Provider) error {
 
 	// If the provider specifies an auth plugin to use instead of the default one, make sure it exists
 	if specifiedPlugin := p.AuthPlugin(); specifiedPlugin != "" {
-		if plg := s.setPlugin(specifiedPlugin); plg == nil {
+		if plg := s.getPlugin(specifiedPlugin); plg == nil {
 			return fmt.Errorf("auth plugin %s not found for provider %s", specifiedPlugin, id)
 		}
 	}

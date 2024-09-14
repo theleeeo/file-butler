@@ -236,7 +236,7 @@ func (s *Server) authorizeRequest(ctx context.Context, reqType authorization.Req
 		authPluginName = s.defaultAuthPlugin
 	}
 
-	authPlugin := s.setPlugin(authPluginName)
+	authPlugin := s.getPlugin(authPluginName)
 	if authPlugin == nil {
 		return lerr.Newf(http.StatusInternalServerError, "no auth plugin found for provider %s", p.Id())
 	}

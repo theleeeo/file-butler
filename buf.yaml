@@ -1,4 +1,8 @@
-version: v1
+version: v2
+modules:
+  - path: proto
+# deps:
+#   - buf.build/googleapis/googleapis
 breaking:
   use:
     - FILE
