@@ -257,11 +257,7 @@ func (s *Server) authorizeRequest(ctx context.Context, reqType authorization.Req
 	}
 
 	if err := authPlugin.Authorize(ctx, req); err != nil {
-		s, ok := status.FromError(err)
-		if !ok {
-			return lerr.Newf(http.StatusInternalServerError, "plugin error not a grpc status! error=%s", err.Error())
-		}
-
+		s := status.Convert(err)
 		if s.Code() == codes.Unauthenticated {
 			return lerr.Newf(http.StatusUnauthorized, "Unauthenticated: %s", s.Message())
 		}
