@@ -87,3 +87,12 @@ func (p *Provider) ListObjects(ctx context.Context, prefix string) (provider.Lis
 
 	return called.Get(0).(provider.ListObjectsResponse), called.Error(1)
 }
+
+func (p *Provider) DeleteObject(ctx context.Context, key string) error {
+	called := p.Called(ctx, key)
+	if called.Get(0) == nil {
+		return nil
+	}
+
+	return called.Error(0)
+}

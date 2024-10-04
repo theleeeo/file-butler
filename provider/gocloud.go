@@ -126,3 +126,15 @@ func (n *GocloudProvider) ListObjects(ctx context.Context, prefix string) (ListO
 		Keys: files,
 	}, nil
 }
+
+func (n *GocloudProvider) DeleteObject(ctx context.Context, key string) error {
+	if err := n.bucket.Delete(ctx, key); err != nil {
+		if gcerrors.Code(err) == gcerrors.NotFound {
+			return ErrNotFound
+		}
+
+		return err
+	}
+
+	return nil
+}

@@ -13,6 +13,7 @@ enum RequestType {
   REQUEST_TYPE_UPLOAD = 2;
   REQUEST_TYPE_GET_METADATA = 3;
   REQUEST_TYPE_LIST = 4;
+  REQUEST_TYPE_DELETE = 5;
 }
 
 message AuthorizeRequest {
