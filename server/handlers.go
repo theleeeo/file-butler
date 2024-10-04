@@ -199,14 +199,14 @@ func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			log.Println("error parsing multipart form:", err)
 
-			return nil, lerr.Wrap(err, http.StatusBadRequest, "error parsing multipart form:")
+			return nil, lerr.Wrap(err, http.StatusBadRequest, "error parsing multipart form")
 		}
 
 		file, _, err := r.FormFile("file")
 		if err != nil {
 			log.Println("error getting file from form:", err)
 
-			return nil, lerr.Wrap(err, http.StatusBadRequest, "error getting file from form:")
+			return nil, lerr.Wrap(err, http.StatusBadRequest, "error getting file from form")
 		}
 		data = file
 	} else {
