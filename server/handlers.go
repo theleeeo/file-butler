@@ -28,6 +28,8 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 		reqType = authorization.RequestType_REQUEST_TYPE_DOWNLOAD
 	case http.MethodPut, http.MethodPost:
 		reqType = authorization.RequestType_REQUEST_TYPE_UPLOAD
+	case http.MethodDelete:
+		reqType = authorization.RequestType_REQUEST_TYPE_DELETE
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -84,8 +86,28 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.handleUpload(r, p, key); err != nil {
-		lerr.ToHTTP(w, err)
+	if reqType == authorization.RequestType_REQUEST_TYPE_UPLOAD {
+		if err := s.handleUpload(r, p, key); err != nil {
+			lerr.ToHTTP(w, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if reqType == authorization.RequestType_REQUEST_TYPE_DELETE {
+		if err := p.DeleteObject(r.Context(), key); err != nil {
+			if errors.Is(err, provider.ErrNotFound) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
@@ -177,14 +199,14 @@ func getDataSource(r *http.Request, allowRawBody bool) (io.ReadCloser, error) {
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			log.Println("error parsing multipart form:", err)
 
-			return nil, lerr.Wrap(err, http.StatusBadRequest, "error parsing multipart form:")
+			return nil, lerr.Wrap(err, http.StatusBadRequest, "error parsing multipart form")
 		}
 
 		file, _, err := r.FormFile("file")
 		if err != nil {
 			log.Println("error getting file from form:", err)
 
-			return nil, lerr.Wrap(err, http.StatusBadRequest, "error getting file from form:")
+			return nil, lerr.Wrap(err, http.StatusBadRequest, "error getting file from form")
 		}
 		data = file
 	} else {
@@ -257,11 +279,7 @@ func (s *Server) authorizeRequest(ctx context.Context, reqType authorization.Req
 	}
 
 	if err := authPlugin.Authorize(ctx, req); err != nil {
-		s, ok := status.FromError(err)
-		if !ok {
-			return lerr.Newf(http.StatusInternalServerError, "plugin error not a grpc status! error=%s", err.Error())
-		}
-
+		s := status.Convert(err)
 		if s.Code() == codes.Unauthenticated {
 			return lerr.Newf(http.StatusUnauthorized, "Unauthenticated: %s", s.Message())
 		}

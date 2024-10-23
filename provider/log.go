@@ -60,3 +60,8 @@ func (n *LogProvider) ListObjects(ctx context.Context, prefix string) (ListObjec
 	log.Printf("ListObjects %s\n", prefix)
 	return ListObjectsResponse{}, nil
 }
+
+func (n *LogProvider) DeleteObject(ctx context.Context, key string) error {
+	log.Printf("DeleteObject %s\n", key)
+	return nil
+}

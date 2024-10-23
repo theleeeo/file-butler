@@ -54,6 +54,7 @@ type Provider interface {
 	PutObject(ctx context.Context, key string, data io.Reader, opts PutOptions) error
 	GetTags(ctx context.Context, key string) (map[string]string, error)
 	ListObjects(ctx context.Context, prefix string) (ListObjectsResponse, error)
+	DeleteObject(ctx context.Context, key string) error
 }
 
 type GetOptions struct {

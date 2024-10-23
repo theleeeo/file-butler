@@ -232,3 +232,16 @@ func (s *S3Provider) ListObjects(ctx context.Context, prefix string) (ListObject
 		Keys: files,
 	}, nil
 }
+
+func (s *S3Provider) DeleteObject(ctx context.Context, key string) error {
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: &s.bucketName,
+		Key:    &key,
+	})
+	if err != nil {
+		// S3 seems to return a 200 OK even if the object does not exist so no need to check for that.
+		return err
+	}
+
+	return nil
+}

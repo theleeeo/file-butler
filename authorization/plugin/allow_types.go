@@ -26,6 +26,8 @@ func NewAllowTypesPlugin(args []string) (*AllowTypesPlugin, error) {
 			reqType = authorization.RequestType_REQUEST_TYPE_GET_METADATA
 		case "list":
 			reqType = authorization.RequestType_REQUEST_TYPE_LIST
+		case "delete":
+			reqType = authorization.RequestType_REQUEST_TYPE_DELETE
 		default:
 			return nil, status.Error(codes.InvalidArgument, "unknown request type: "+arg)
 		}

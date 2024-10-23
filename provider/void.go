@@ -45,3 +45,7 @@ func (n *VoidProvider) GetTags(ctx context.Context, key string) (map[string]stri
 func (n *VoidProvider) ListObjects(ctx context.Context, prefix string) (ListObjectsResponse, error) {
 	return ListObjectsResponse{}, nil
 }
+
+func (n *VoidProvider) DeleteObject(ctx context.Context, key string) error {
+	return nil
+}

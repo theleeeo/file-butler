@@ -26,6 +26,8 @@ func InternalErrorRedacter(next http.Handler) http.Handler {
 			return
 		}
 
+		log.Printf("%s %s %d", r.Method, r.URL.Path, respCatcher.Code)
+
 		copyHeaders(w.Header(), respCatcher.Header())
 		w.WriteHeader(respCatcher.Code)
 		_, _ = w.Write(respCatcher.Body.Bytes())
